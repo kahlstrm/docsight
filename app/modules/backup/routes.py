@@ -10,7 +10,7 @@ from datetime import datetime
 
 from flask import Blueprint, request, jsonify, redirect, send_file, url_for
 
-from app.web_auth import require_auth, _auth_required, _get_client_ip
+from app.web_auth import _require_session_auth, _auth_required, _get_client_ip
 from app.runtime import current_runtime
 
 from werkzeug.utils import secure_filename
@@ -59,7 +59,7 @@ def _int_config(config_mgr, key, default):
 
 
 @bp.route("/api/backup", methods=["POST"])
-@require_auth
+@_require_session_auth
 def api_backup_download():
     """Create a backup and stream it as download."""
     _config_manager = current_runtime().config_manager
@@ -107,7 +107,7 @@ def api_backup_download():
 
 
 @bp.route("/api/backup/scheduled", methods=["POST"])
-@require_auth
+@_require_session_auth
 def api_backup_scheduled():
     """Create a backup in the configured backup path."""
     _config_manager = current_runtime().config_manager
@@ -126,7 +126,7 @@ def api_backup_scheduled():
 
 
 @bp.route("/api/backup/list")
-@require_auth
+@_require_session_auth
 def api_backup_list():
     """List backups in the configured backup path."""
     _config_manager = current_runtime().config_manager
@@ -137,7 +137,7 @@ def api_backup_list():
 
 
 @bp.route("/api/backup/<filename>", methods=["DELETE"])
-@require_auth
+@_require_session_auth
 def api_backup_delete(filename):
     """Delete a backup file."""
     _config_manager = current_runtime().config_manager
@@ -167,7 +167,7 @@ def api_restore_validate():
     Auth required if already configured.
     """
     _config_manager = current_runtime().config_manager
-    if _config_manager and _config_manager.is_configured() and _auth_required():
+    if _auth_required(session_only=True):
         return redirect(url_for("login"))
     if not (_config_manager and _config_manager.is_configured()):
         if _check_restore_rate_limit():
@@ -199,7 +199,7 @@ def api_restore():
     _config_manager = current_runtime().config_manager
     if _config_manager is None:
         return jsonify({"error": "Not initialized"}), 500
-    if _config_manager.is_configured() and _auth_required():
+    if _auth_required(session_only=True):
         return redirect(url_for("login"))
     if not _config_manager.is_configured():
         if _check_restore_rate_limit():
@@ -238,7 +238,7 @@ def api_restore():
 
 
 @bp.route("/api/browse")
-@require_auth
+@_require_session_auth
 def api_browse():
     """Browse server-side directories for backup path selection."""
     path = request.args.get("path", "/backup")
