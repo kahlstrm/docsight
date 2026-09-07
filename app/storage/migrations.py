@@ -242,6 +242,15 @@ def _segment_applied(_conn: sqlite3.Connection) -> bool:
     return False
 
 
+def _token_scope_applied(conn: sqlite3.Connection) -> bool:
+    return "scope" in table_columns(conn, "api_tokens")
+
+
+def _apply_token_scope(conn: sqlite3.Connection) -> None:
+    # Existing integrations retain their privileges; new tokens explicitly choose a scope.
+    add_column_if_missing(conn, "api_tokens", "scope", "scope TEXT NOT NULL DEFAULT 'api'")
+
+
 CORE_MIGRATIONS: tuple[Migration, ...] = (
     Migration("core-0001-baseline", _apply_core_baseline, _core_baseline_applied),
     Migration(
@@ -256,6 +265,7 @@ CORE_MIGRATIONS: tuple[Migration, ...] = (
         _snapshot_columns_applied,
     ),
     Migration("core-0005-meta-version", _apply_meta_version, _meta_version_applied),
+    Migration("core-0006-token-scope", _apply_token_scope, _token_scope_applied),
 )
 
 SEGMENT_MIGRATIONS: tuple[Migration, ...] = (

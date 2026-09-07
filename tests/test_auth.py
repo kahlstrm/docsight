@@ -403,7 +403,7 @@ class TestApiTokenAuth:
         self._login(auth_client_with_storage)
         resp = auth_client_with_storage.post(
             "/api/tokens",
-            data=json.dumps({"name": "ci-test"}),
+            data=json.dumps({"name": "ci-test", "scope": "api"}),
             content_type="application/json",
         )
         assert resp.status_code == 201
@@ -615,3 +615,22 @@ class TestApiTokenAuth:
         })
         resp = auth_client_with_storage.get("/health")
         assert resp.status_code == 200
+
+
+def test_new_api_tokens_default_to_metrics(auth_client_with_storage):
+    client = auth_client_with_storage
+    client.post('/login', data={'password': 'secret123', 'csrf_token': _login_csrf(client)})
+    response = client.post('/api/tokens', json={'name': 'prometheus'})
+    assert response.status_code == 201
+    assert response.get_json()['scope'] == 'metrics'
+    client.get('/logout')
+    headers = {'Authorization': 'Bearer ' + response.get_json()['token']}
+    assert client.get('/metrics', headers=headers).status_code == 200
+    assert client.get('/api/snapshots', headers=headers).status_code == 403
+
+
+@pytest.mark.parametrize('scope', ['admin', '', None, []])
+def test_token_api_rejects_invalid_scope(auth_client_with_storage, scope):
+    client = auth_client_with_storage
+    client.post('/login', data={'password': 'secret123', 'csrf_token': _login_csrf(client)})
+    assert client.post('/api/tokens', json={'name': 'test', 'scope': scope}).status_code == 400

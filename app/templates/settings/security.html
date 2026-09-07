@@ -36,6 +36,11 @@
             </div>
         </div>
 
+        <label for="api-token-scope">{{ t.get('api_token_scope', 'Access') }}</label>
+        <select class="form-input" id="api-token-scope">
+            <option value="metrics">{{ t.get('api_token_scope_metrics', 'Metrics only (Prometheus)') }}</option>
+            <option value="api">{{ t.get('api_token_scope_api', 'General API access') }}</option>
+        </select>
         <!-- Create Token -->
         <div class="input-with-action" style="margin-bottom: var(--space-md);">
             <input class="form-input" type="text" id="api-token-name" placeholder="{{ t.api_token_name_placeholder }}">
@@ -63,6 +68,7 @@
                 <tr>
                     <th>{{ t.api_token_name }}</th>
                     <th>{{ t.api_token_prefix }}</th>
+                    <th>{{ t.get("api_token_scope", "Access") }}</th>
                     <th>{{ t.api_token_last_used }}</th>
                     <th></th>
                 </tr>
