@@ -258,9 +258,9 @@ def test_docker_paths_tags_manual_and_concurrency_contract():
 
 
 
-def test_image_publication_requires_tests_and_weekly_fresh_layers():
+def test_image_publication_requires_tests():
     workflow = load_workflow("docker.yml")
-    assert workflow["on"]["schedule"] == [{"cron": "41 5 * * 1"}]
+    assert "schedule" not in workflow["on"]
     jobs = workflow["jobs"]
     publish = jobs["build-and-push"]
     assert publish["needs"] == "verify"
@@ -272,7 +272,6 @@ def test_image_publication_requires_tests_and_weekly_fresh_layers():
         assert command in verification["run"]
     build = next(step for step in publish["steps"] if step.get("id") == "build")
     assert build["with"]["pull"] is True
-    assert build["with"]["no-cache"] == "${{ github.event_name == 'schedule' }}"
 
 
 def test_test_workflow_detector_schedule_and_exact_path_contracts():

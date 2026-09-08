@@ -2,8 +2,8 @@
 
 The image workflow tests the exact source revision before publishing to
 `ghcr.io/kahlstrm/docsight`. It runs on image changes merged to main, version tags,
-manual dispatch, and Mondays at 05:41 UTC. Weekly builds disable the build cache
-and refresh the base image so available OS updates are installed.
+and manual dispatch. There are no scheduled image rebuilds.
+Use manual dispatch when an image rebuild is needed without a source change.
 
 Main builds publish `main`, `latest`, and a full commit-SHA tag. Version tags and
 manual branch builds also publish a commit-SHA tag; a branch build does not move
