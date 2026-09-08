@@ -470,7 +470,13 @@ class DemoCollector(Collector):
         us_bitrates = [ch["theoretical_bitrate"] for ch in us_channels if ch.get("theoretical_bitrate")]
         us_capacity = round(sum(us_bitrates), 1) if us_bitrates else None
 
-        signal_families = _build_signal_family_summary(ds_channels, us_channels)
+        # Demo families are fixed; avoid reclassifying every historical channel.
+        signal_families = _build_signal_family_summary(
+            [{**ch, "channel_family": "ofdm" if ch["docsis_version"] == "3.1" else "sc_qam"}
+             for ch in ds_channels],
+            [{**ch, "channel_family": "ofdma" if ch["docsis_version"] == "3.1" else "sc_qam"}
+             for ch in us_channels],
+        )
         ds_family_summaries = signal_families["downstream"]["families"]
         us_family_summaries = signal_families["upstream"]["families"]
 
@@ -1190,12 +1196,14 @@ class DemoCollector(Collector):
             return struct.pack(">I", len(data)) + c + crc
 
         # Generate pixel data: quality bar chart with green/yellow/red bands
-        raw = b""
+        raw = bytearray()
+        quality_bases = [0.8 + 0.2 * math.sin(x * 0.02 + seed) for x in range(width)]
         for y in range(height):
-            row = b"\x00"  # PNG filter: None
-            for x in range(width):
+            raw.append(0)  # PNG filter: None
+            fade = 0.7 + 0.3 * (height - y) / height
+            for quality_base in quality_bases:
                 # Simulate quality: mostly green, some yellow/red sections
-                quality = 0.8 + 0.2 * math.sin(x * 0.02 + seed) + rng.uniform(-0.05, 0.05)
+                quality = quality_base + rng.uniform(-0.05, 0.05)
                 quality = max(0, min(1, quality))
 
                 # Quality bar: bottom portion filled, top portion background
@@ -1208,12 +1216,10 @@ class DemoCollector(Collector):
                     else:
                         r, g, b = 200, 50, 50  # red
                     # Slight vertical gradient
-                    fade = 0.7 + 0.3 * (height - y) / height
                     r, g, b = int(r * fade), int(g * fade), int(b * fade)
                 else:
                     r, g, b = 30, 30, 40  # dark background
-                row += bytes([r, g, b])
-            raw += row
+                raw.extend((r, g, b))
 
         sig = b"\x89PNG\r\n\x1a\n"
         ihdr = _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))

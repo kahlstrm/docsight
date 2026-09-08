@@ -569,3 +569,20 @@ class TestMigrateEndpoint:
         incidents = _js.get_incidents()
         assert len(incidents) == 1
         assert incidents[0]["name"] == "User Incident"
+
+
+@pytest.mark.parametrize(("width", "height", "seed", "pixel_digest"), [
+    (16, 8, 0, "ba84ad1339f9330719223ccbd632eac97eab0f617fdd3d7d43d147558f441bdf"),
+    (37, 19, 7, "6b35e68c62f0800bbfaf671aad5b142e3975be11bfc633fa6f9368e6d517bd52"),
+    (800, 200, 0, "f6a57672f25eca6138fc646ca9a32a4e7e31f6286fff878d323aff29d9c05e87"),
+])
+def test_bqm_generator_preserves_decoded_pixels(width, height, seed, pixel_digest):
+    from hashlib import sha256
+    from io import BytesIO
+
+    from PIL import Image
+
+    with Image.open(BytesIO(DemoCollector._generate_bqm_png(width, height, seed))) as image:
+        assert image.size == (width, height)
+        assert image.mode == "RGB"
+        assert sha256(image.tobytes()).hexdigest() == pixel_digest
