@@ -96,6 +96,7 @@ def format_metrics(
     device_info: DeviceInfo | None,
     connection_info: ConnectionInfo | None,
     last_poll_timestamp: float,
+    poll_success: bool = False,
 ) -> str:
     """Format DOCSight state as Prometheus text exposition format.
 
@@ -175,6 +176,12 @@ def format_metrics(
             if ch.get("snr") is not None:
                 _metric_value(lines, "docsight_downstream_snr_db", ch["snr"],
                               _channel_labels(ch))
+
+        _metric_family_open(lines, "Whether downstream SNR is a usable measurement", "gauge",
+                            "docsight_downstream_snr_valid")
+        for ch in ds_channels:
+            valid = ch.get("snr_valid", ch.get("snr") is not None)
+            _metric_value(lines, "docsight_downstream_snr_valid", int(valid), _channel_labels(ch))
 
         _metric_family_open(
             lines,
@@ -342,5 +349,8 @@ def format_metrics(
         "docsight_last_poll_timestamp_seconds",
         float(last_poll_timestamp),
     )
+
+    _metric(lines, "Whether the latest completed modem poll succeeded (0 before first success)", "gauge",
+           "docsight_modem_poll_success", int(poll_success))
 
     return "\n".join(lines) + "\n"

@@ -661,3 +661,102 @@ class TestRegistration:
         from app.drivers import driver_registry
         d = driver_registry.load_driver("sagemcom", "http://192.168.100.1", "admin", "pass")
         assert isinstance(d, SagemcomDriver)
+
+
+@pytest.mark.parametrize('fault', ['action', 'callback', 'missing', 'malformed', 'empty', 'unlocked'])
+def test_rejects_unusable_channel_response(driver, fault):
+    row = {'ChannelID': 1, 'LockStatus': True, 'SNR': 40, 'Modulation': 'Qam256'}
+    response = _docsis_response([row], [])
+    action = response['reply']['actions'][0]
+    if fault == 'action':
+        action['error']['description'] = 'XMO_UNKNOWN_PATH_ERR'
+    elif fault == 'callback':
+        action['callbacks'][0]['result']['description'] = 'XMO_UNKNOWN_PATH_ERR'
+    elif fault == 'missing':
+        response['reply']['actions'].pop()
+    elif fault == 'malformed':
+        action['callbacks'][0]['parameters']['value'] = 'invalid'
+    elif fault == 'empty':
+        action['callbacks'][0]['parameters']['value'] = []
+    else:
+        row['LockStatus'] = False
+    driver._session.post = _mock_post([response])
+    with pytest.raises(RuntimeError, match='Sagemcom'):
+        driver._fetch_docsis_data()
+
+
+def _metadata_response(uptime, status):
+    response = _device_info_response()
+    for index, (path, value) in enumerate([
+        ('Device/DeviceInfo/UpTime', uptime),
+        ('Device/Docsis/CableModem/Status', status),
+    ], start=2):
+        response['reply']['actions'].append({
+            'id': index, 'error': {'description': 'XMO_NO_ERR'},
+            'callbacks': [{'result': {'description': 'XMO_NO_ERR'},
+                           'xpath': path, 'parameters': {'value': value}}],
+        })
+    return response
+
+
+@pytest.mark.parametrize('uptime,expected', [(170015, 170015), ('170015', 170015), (0, 0),
+                                            (-1, None), (True, None), ('bad', None), (1.5, None)])
+def test_uptime_normalization(driver, uptime, expected):
+    driver._session.post = _mock_post([_metadata_response(uptime, 'OPERATIONAL')])
+    assert driver.get_device_info().get('uptime_seconds') == expected
+
+
+@pytest.mark.parametrize('status,expected', [('OPERATIONAL', 'online'), ('ONLINE', 'online'),
+    ('FORWARDING_DISABLED', 'offline'), ('UNRECOGNIZED', None), (None, None), ([], None)])
+def test_docsis_status_normalization(driver, status, expected):
+    driver._session.post = _mock_post([_metadata_response(170015, status)])
+    assert driver.get_device_info().get('docsis_status') == expected
+
+
+def test_metadata_reboot_and_missing_values_are_not_cached(driver):
+    driver._session.post = _mock_post([
+        _metadata_response(170015, 'OPERATIONAL'), _metadata_response(2, 'FORWARDING_DISABLED'),
+        _device_info_response(),
+    ])
+    assert driver.get_device_info()['uptime_seconds'] == 170015
+    info = driver.get_device_info()
+    assert info['uptime_seconds'] == 2
+    assert info['docsis_status'] == 'offline'
+    info = driver.get_device_info()
+    assert 'uptime_seconds' not in info
+    assert 'docsis_status' not in info
+    assert info['model'] == 'FAST3896_WIFIHUBC4'
+
+
+def test_failed_optional_action_preserves_other_metadata(driver):
+    response = _metadata_response(170015, 'OPERATIONAL')
+    response['reply']['actions'][2]['error']['description'] = 'XMO_UNKNOWN_PATH_ERR'
+    driver._session.post = _mock_post([response])
+    info = driver.get_device_info()
+    assert 'uptime_seconds' not in info
+    assert info['docsis_status'] == 'online'
+    assert info['model'] == 'FAST3896_WIFIHUBC4'
+
+
+@pytest.mark.parametrize('snr,valid', [(0, False), (None, False), ('bad', False),
+                                      (float('nan'), False), (True, False), (40, True), ('40', True)])
+@pytest.mark.parametrize('bandwidth', [8000000, 96000000])
+def test_snr_validity_keeps_channel_and_counters(driver, snr, valid, bandwidth):
+    from app.analyzer import analyze
+    from app.prometheus import format_metrics
+
+    ds30, ds31 = driver._parse_downstream([{
+        'ChannelID': 21, 'LockStatus': True, 'Frequency': 562000000,
+        'PowerLevel': 2.3, 'SNR': snr, 'Modulation': 'Qam256', 'BandWidth': bandwidth,
+        'CorrectableCodewords': 123, 'UncorrectableCodewords': 4,
+    }])
+    analysis = analyze({'channelDs': {'docsis30': ds30, 'docsis31': ds31}, 'channelUs': {}})
+    channel = analysis['ds_channels'][0]
+    assert channel['correctable_errors'] == 123
+    assert channel['uncorrectable_errors'] == 4
+    assert (channel['snr'] is not None) == valid
+    if not valid:
+        assert channel['health'] != 'good'
+        assert 'unavailable' in channel['health_detail']
+    output = format_metrics(analysis, {}, {}, 1000)
+    assert f'docsight_downstream_snr_valid{{channel_id="21",frequency="562"}} {int(valid)}' in output
