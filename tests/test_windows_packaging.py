@@ -347,6 +347,9 @@ def test_build_script_uses_hash_pinned_requirements_and_creates_zip_hash():
     assert "--require-hashes" in script
     assert "requirements-runtime-windows.txt" in script
     assert "requirements-build.txt" in script
+    assert "--only-binary=:all: --require-hashes" in script
+    assert "requirements-uv.txt" in script
+    assert script.count("-m uv pip install --python $VenvPython --compile-bytecode --require-hashes") == 2
     assert "Invoke-Checked" in script
     assert "[System.IO.Path]::IsPathRooted($OutputDirectory)" in script
     assert "[System.Text.UTF8Encoding]::new($false)" in script

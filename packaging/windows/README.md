@@ -264,3 +264,7 @@ branding and PE metadata remain isolated under `packaging/windows/`.
 - No WebView shell, auto-start, updater, installer, MSI, or MSIX.
 - No native Windows ICMP/traceroute diagnostics.
 - No code-signing integration while provider onboarding is pending.
+
+Dependency installation uses uv, bootstrapped from the hash-pinned root
+`requirements-uv.txt` into the build virtual environment. No separate uv
+installation is required to run `build.ps1`.

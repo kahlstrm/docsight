@@ -42,6 +42,7 @@ DOCKER_PATHS = [
     "app/**",
     "tools/**",
     "requirements.txt",
+    "requirements-uv.txt",
     "Dockerfile",
     ".dockerignore",
     "entrypoint.sh",
@@ -364,3 +365,34 @@ def test_changed_workflows_keep_every_action_sha_pinned(name):
     ]
     assert uses
     assert all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", action) for action in uses)
+
+
+@pytest.mark.parametrize("name", ["docker.yml", "test.yml", "full-e2e.yml"])
+def test_uv_installs_keep_hash_checks_and_explicit_python(name):
+    for job in load_workflow(name)["jobs"].values():
+        steps = job.get("steps", [])
+        installs = [step["run"] for step in steps if "uv pip install" in step.get("run", "")]
+        if not installs:
+            continue
+        setup = next(step for step in steps if step.get("uses", "").startswith("astral-sh/setup-uv@"))
+        assert setup["with"]["version"] == "0.12.5"
+        assert setup["with"]["enable-cache"] is True
+        for script in installs:
+            for command in script.splitlines():
+                if "uv pip install" in command:
+                    assert "--python python" in command
+                    assert "--compile-bytecode" in command
+                    if "-r " in command:
+                        assert "--require-hashes" in command
+
+
+def test_container_preserves_platforms_and_keeps_uv_out_of_runtime():
+    workflow = load_workflow("docker.yml")
+    build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("id") == "build")
+    assert build["with"]["platforms"] == "linux/amd64,linux/arm64,linux/arm/v7"
+    builder, runtime = (ROOT / "Dockerfile").read_text().split("# --- runtime stage:")
+    assert "--only-binary=:all: --require-hashes -r requirements-uv.txt" in builder
+    assert "--require-hashes --prefix=/install -r requirements.txt" in builder
+    assert "--prefix=/install -r requirements-uv.txt" not in builder
+    assert "COPY --from=builder /install /usr/local" in runtime
+    assert "uv pip install" not in runtime
