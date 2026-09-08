@@ -253,7 +253,25 @@ def test_docker_paths_tags_manual_and_concurrency_contract():
         if step.get("id") == "meta"
     )
     assert "type=ref,event=tag" in metadata_tags
-    assert "type=sha,enable=${{ github.event_name == 'workflow_dispatch'" in metadata_tags
+    assert "type=sha,format=long" in metadata_tags
+    assert "type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}" in metadata_tags
+
+
+
+def test_image_publication_requires_tests():
+    workflow = load_workflow("docker.yml")
+    assert "schedule" not in workflow["on"]
+    jobs = workflow["jobs"]
+    publish = jobs["build-and-push"]
+    assert publish["needs"] == "verify"
+    assert publish["if"] == "github.event_name != 'pull_request'"
+    assert not jobs["verify"].get("continue-on-error", False)
+    verification = next(step for step in jobs["verify"]["steps"] if step.get("name") == "Verify application")
+    assert not verification.get("continue-on-error", False)
+    for command in ("python -m pytest tests/", "npm test", "python scripts/i18n_check.py --validate"):
+        assert command in verification["run"]
+    build = next(step for step in publish["steps"] if step.get("id") == "build")
+    assert build["with"]["pull"] is True
 
 
 def test_test_workflow_detector_schedule_and_exact_path_contracts():
