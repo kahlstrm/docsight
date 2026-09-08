@@ -1,0 +1,34 @@
+name: Probe native ARMv7 on ARM64
+on:
+  push:
+    branches: [ci/probe-native-armv7]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    env:
+      IMAGE: ghcr.io/kahlstrm/docsight@sha256:28851c27a5f959be75543e05f192bcc6d55c721802c95f748833f7d2fad45e00
+    steps:
+      - name: Inspect host and disable binfmt emulation
+        run: |
+          uname -a
+          lscpu
+          if [ -f "/boot/config-$(uname -r)" ]; then
+            grep -E 'CONFIG_COMPAT|CONFIG_BINFMT' "/boot/config-$(uname -r)"
+          fi
+          if ! mountpoint -q /proc/sys/fs/binfmt_misc; then
+            sudo mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
+          fi
+          ls -l /proc/sys/fs/binfmt_misc
+          echo 0 | sudo tee /proc/sys/fs/binfmt_misc/status
+          test "$(cat /proc/sys/fs/binfmt_misc/status)" = disabled
+      - name: Verify native ARM64 container
+        run: |
+          docker run --rm --platform linux/arm64 --entrypoint python "$IMAGE" \
+            -c 'import platform, struct; print(platform.machine(), struct.calcsize("P") * 8); assert struct.calcsize("P") == 8'
+      - name: Test native ARMv7 container
+        run: |
+          docker run --rm --platform linux/arm/v7 --entrypoint python "$IMAGE" \
+            -c 'import platform, struct, flask, cryptography; print(platform.machine(), struct.calcsize("P") * 8); assert struct.calcsize("P") == 4; print("ARMv7 Python and application imports work without binfmt emulation")'
