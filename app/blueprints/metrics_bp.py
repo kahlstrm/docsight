@@ -20,7 +20,7 @@ def _has_valid_bearer_token() -> bool:
     auth_header = request.headers.get("Authorization", "")
     if not storage or not auth_header.startswith("Bearer "):
         return False
-    token_info = storage.validate_api_token(auth_header[7:])
+    token_info = getattr(request, "_api_token", None) or storage.validate_api_token(auth_header[7:])
     if token_info:
         request._api_token = token_info
         return True

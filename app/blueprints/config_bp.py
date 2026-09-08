@@ -135,9 +135,12 @@ def api_tokens_create():
     name = (data or {}).get("name", "").strip()
     if not name:
         return jsonify({"error": "Token name is required"}), 400
-    token_id, plaintext = _storage.create_api_token(name)
+    scope = (data or {}).get("scope", "metrics")
+    if scope not in ("metrics", "api"):
+        return jsonify({"error": "Token scope must be metrics or api"}), 400
+    token_id, plaintext = _storage.create_api_token(name, scope=scope)
     audit_log.info("API token created: id=%s name=%s ip=%s", token_id, name, _get_client_ip())
-    return jsonify({"id": token_id, "token": plaintext, "name": name}), 201
+    return jsonify({"id": token_id, "token": plaintext, "name": name, "scope": scope}), 201
 
 
 @config_bp.route("/api/tokens/<int:token_id>", methods=["DELETE"])

@@ -31,8 +31,10 @@ def _should_refresh_last_used(previous, current):
 
 class TokenMethods:
 
-    def create_api_token(self, name):
+    def create_api_token(self, name, scope="metrics"):
         """Create a new API token. Returns (token_id, plaintext_token)."""
+        if scope not in {"metrics", "api"}:
+            raise ValueError("Token scope must be metrics or api")
         raw = secrets.token_urlsafe(48)
         plaintext = "dsk_" + raw
         prefix = plaintext[:_TOKEN_PREFIX_LENGTH]
@@ -40,8 +42,8 @@ class TokenMethods:
         created_at = utc_now()
         with self._write() as conn:
             cur = conn.execute(
-                "INSERT INTO api_tokens (name, token_hash, token_prefix, created_at) VALUES (?, ?, ?, ?)",
-                (name, token_hash, prefix, created_at),
+                "INSERT INTO api_tokens (name, token_hash, token_prefix, created_at, scope) VALUES (?, ?, ?, ?, ?)",
+                (name, token_hash, prefix, created_at, scope),
             )
             return cur.lastrowid, plaintext
 
@@ -51,7 +53,7 @@ class TokenMethods:
         with self._read() as conn:
             rows = conn.execute(
                 """
-                SELECT id, name, token_hash, token_prefix, created_at, last_used_at
+                SELECT id, name, token_hash, token_prefix, created_at, last_used_at, scope
                 FROM api_tokens
                 WHERE revoked = 0 AND token_prefix = ?
                 """,
@@ -71,6 +73,7 @@ class TokenMethods:
                     "name": row["name"],
                     "token_prefix": row["token_prefix"],
                     "created_at": row["created_at"],
+                    "scope": row["scope"],
                 }
         return None
 
@@ -78,7 +81,7 @@ class TokenMethods:
         """Return list of all tokens (without hashes) for UI display."""
         with self._read() as conn:
             rows = conn.execute(
-                "SELECT id, name, token_prefix, created_at, last_used_at, revoked FROM api_tokens ORDER BY created_at DESC"
+                "SELECT id, name, token_prefix, created_at, last_used_at, revoked, scope FROM api_tokens ORDER BY created_at DESC"
             ).fetchall()
         return [dict(r) for r in rows]
 

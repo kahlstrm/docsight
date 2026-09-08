@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Extras: este afișat numai alineatul citat.",
   "glossary_law_source_label": "Sursă oficială",
   "glossary_law_reviewed_label": "Sursă verificată",
-  "glossary_law_disclaimer": "Informații generale, nu consultanță juridică."
+  "glossary_law_disclaimer": "Informații generale, nu consultanță juridică.",
+  "api_token_scope": "Acces",
+  "api_token_scope_metrics": "Doar metrici (Prometheus)",
+  "api_token_scope_api": "Acces general la API"
 }

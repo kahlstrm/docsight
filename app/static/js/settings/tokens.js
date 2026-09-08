@@ -32,6 +32,7 @@ function loadApiTokens() {
             code.textContent = tk.token_prefix + '...';
             prefixTd.appendChild(code);
             tr.appendChild(prefixTd);
+            tr.appendChild(_tokenCell(tk.scope === "metrics" ? (T.api_token_scope_metrics || "Metrics only (Prometheus)") : (T.api_token_scope_api || "General API access"), "padding:4px 8px;"));
             tr.appendChild(_tokenCell(tk.last_used_at || '\u2014', 'padding:4px 8px;'));
             var actionTd = document.createElement('td');
             actionTd.style.cssText = 'padding:4px 8px;';
@@ -59,7 +60,7 @@ function createApiToken() {
     fetch(docsightUrl('/api/tokens'), {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: name})
+        body: JSON.stringify({name: name, scope: document.getElementById("api-token-scope").value})
     }).then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
     .then(function(res) {
         if (!res.ok) { showToast(res.data.error || (T.error_prefix || 'Error'), false); return; }

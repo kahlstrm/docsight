@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Utdrag: endast det citerade stycket visas.",
   "glossary_law_source_label": "Officiell källa",
   "glossary_law_reviewed_label": "Källa kontrollerad",
-  "glossary_law_disclaimer": "Allmän information, inte juridisk rådgivning."
+  "glossary_law_disclaimer": "Allmän information, inte juridisk rådgivning.",
+  "api_token_scope": "Åtkomst",
+  "api_token_scope_metrics": "Endast mätvärden (Prometheus)",
+  "api_token_scope_api": "Allmän API-åtkomst"
 }

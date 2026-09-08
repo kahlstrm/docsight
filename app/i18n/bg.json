@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Извадка: показана е само цитираната алинея.",
   "glossary_law_source_label": "Официален източник",
   "glossary_law_reviewed_label": "Източникът е проверен",
-  "glossary_law_disclaimer": "Обща информация, не правен съвет."
+  "glossary_law_disclaimer": "Обща информация, не правен съвет.",
+  "api_token_scope": "Достъп",
+  "api_token_scope_metrics": "Само метрики (Prometheus)",
+  "api_token_scope_api": "Общ достъп до API"
 }

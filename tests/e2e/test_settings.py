@@ -1383,3 +1383,19 @@ class TestBackupModule:
         backup_list = settings_page.locator("#backup-list")
         assert backup_list.locator("code").first.text_content() == "docsight_backup_2026-03-14_120000.tar.gz"
         assert backup_list.get_by_text("3.0 MB").count() > 0
+
+
+def test_metrics_token_creation_and_scope_display(auth_page, auth_server):
+    _login(auth_page, auth_server)
+    auth_page.goto(f'{auth_server}/settings')
+    auth_page.locator('button[data-section="security"]').click()
+    expect(auth_page.locator('#api-token-scope')).to_have_value('metrics')
+    auth_page.locator('#api-token-name').fill('e2e-prometheus')
+    auth_page.locator('button[onclick="createApiToken()"]').click()
+    expect(auth_page.locator('#api-token-created-banner')).to_be_visible()
+    row = auth_page.locator('#api-tokens-body tr').filter(has_text='e2e-prometheus')
+    expect(row).to_contain_text('Metrics only (Prometheus)')
+    token = auth_page.locator('#api-token-plaintext').inner_text()
+    headers = {'Authorization': 'Bearer ' + token}
+    assert auth_page.request.get(f'{auth_server}/metrics', headers=headers).status == 200
+    assert auth_page.request.get(f'{auth_server}/api/snapshots', headers=headers).status == 403

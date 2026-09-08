@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Výňatek: zobrazena je pouze citovaná část.",
   "glossary_law_source_label": "Oficiální zdroj",
   "glossary_law_reviewed_label": "Zdroj zkontrolován",
-  "glossary_law_disclaimer": "Obecné informace, nikoli právní poradenství."
+  "glossary_law_disclaimer": "Obecné informace, nikoli právní poradenství.",
+  "api_token_scope": "Přístup",
+  "api_token_scope_metrics": "Pouze metriky (Prometheus)",
+  "api_token_scope_api": "Obecný přístup k API"
 }

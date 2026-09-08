@@ -145,6 +145,7 @@ def create_app(
         ),
     )
     attach_runtime(app, runtime)
+    app.before_request(web_auth.restrict_metrics_tokens)
     web_auth.bootstrap_auth_state(app, runtime)
     register_plan(app, complete_plan)
     web.install_core_template_hooks(app)

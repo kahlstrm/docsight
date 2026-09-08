@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Uittreksel: alleen het aangehaalde lid wordt getoond.",
   "glossary_law_source_label": "Officiële bron",
   "glossary_law_reviewed_label": "Bron gecontroleerd",
-  "glossary_law_disclaimer": "Algemene informatie, geen juridisch advies."
+  "glossary_law_disclaimer": "Algemene informatie, geen juridisch advies.",
+  "api_token_scope": "Toegang",
+  "api_token_scope_metrics": "Alleen meetgegevens (Prometheus)",
+  "api_token_scope_api": "Algemene API-toegang"
 }
