@@ -36,7 +36,6 @@ def modulation_page_mobile(page, live_server):
     page.set_viewport_size({"width": 375, "height": 812})
     page.goto(f"{live_server}#modulation")
     page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(2000)
     return page
 
 
@@ -309,6 +308,5 @@ class TestModulationI18n:
     def test_german_labels(self, page, live_server):
         page.goto(f"{live_server}?lang=de#modulation")
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(500)
         content = page.locator("#view-modulation").text_content()
         assert "Modulationsleistung" in content or "Modulation" in content

@@ -368,6 +368,11 @@ def test_report_modal_shows_generation_success_and_error_states(demo_page):
 def test_report_modal_preserves_bnetz_source_and_ignores_stale_generation(demo_page):
     """Report modal keeps selected BNetzA source and ignores stale async results after dismissal."""
     demo_page.evaluate("""
+        const generate = window.generateComplaint;
+        window.generateComplaint = function() {
+            window.__reportTestDone = generate();
+            return window.__reportTestDone;
+        };
         window.__reportTestRequests = [];
         window.__resolveReportTestFetch = null;
         window.__originalReportFetch = window.fetch;
@@ -399,8 +404,8 @@ def test_report_modal_preserves_bnetz_source_and_ignores_stale_generation(demo_p
     expect(modal.locator("#report-step1")).to_be_visible()
     expect(modal.locator("#report-step2")).not_to_be_visible()
     expect(modal.locator("#report-builder-status")).to_have_text("")
-    demo_page.evaluate("window.__resolveReportTestFetch()")
-    demo_page.wait_for_timeout(250)
+    demo_page.evaluate("async () => { window.__resolveReportTestFetch(); await window.__reportTestDone; }")
+    expect(modal.locator("#report-builder-status")).to_have_text("")
     expect(modal.locator("#report-step1")).to_be_visible()
     expect(modal.locator("#report-step2")).not_to_be_visible()
     expect(modal.locator("#report-complaint-text")).to_have_value("")
@@ -691,6 +696,11 @@ def test_ai_export_redaction_copy_and_download_states(demo_page):
 def test_ai_export_ignores_pending_response_after_keyboard_dismissal(demo_page):
     """Dismissed export modals must not keep sensitive pending export text in hidden DOM."""
     demo_page.evaluate("""
+        const generate = window.exportForLLM;
+        window.exportForLLM = function() {
+            window.__exportTestDone = generate();
+            return window.__exportTestDone;
+        };
         window.__resolveExportResponse = null;
         window.__originalExportFetch = window.fetch;
         window.fetch = function(url, options) {
@@ -713,8 +723,7 @@ def test_ai_export_ignores_pending_response_after_keyboard_dismissal(demo_page):
     demo_page.keyboard.press("Escape")
     expect(modal).not_to_be_visible()
 
-    demo_page.evaluate("window.__resolveExportResponse()")
-    demo_page.wait_for_timeout(100)
+    demo_page.evaluate("async () => { window.__resolveExportResponse(); await window.__exportTestDone; }")
 
     expect(modal.locator("#export-text")).to_have_value("")
     expect(modal.locator("#export-status")).to_have_text("")

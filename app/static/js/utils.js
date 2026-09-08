@@ -40,7 +40,7 @@ function exportForLLM() {
     setExportStatus(T.export_loading || 'Loading export preview...', 'progress');
     updateExportSize();
     window.DOCSightModal.open('export-modal');
-    fetch(docsightUrl('/api/export?mode=' + encodeURIComponent(mode)))
+    return fetch(docsightUrl('/api/export?mode=' + encodeURIComponent(mode)))
         .then(function(r) {
             return r.json().then(function(data) {
                 if (!r.ok || data.error) {
@@ -326,7 +326,7 @@ function generateComplaint() {
         setReportBuilderStatus(error.message, 'error');
         return;
     }
-    fetch(docsightUrl('/api/complaint?' + params.toString()))
+    return fetch(docsightUrl('/api/complaint?' + params.toString()))
         .then(function(r) {
             return r.json().then(function(data) {
                 if (!r.ok || data.error) {

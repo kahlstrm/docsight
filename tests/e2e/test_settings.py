@@ -1025,7 +1025,6 @@ class TestSettingsInstantToggleSave:
 
         with settings_page.expect_request("**/api/config"):
             pending_routes[0].fulfill(json={"success": True})
-        settings_page.wait_for_timeout(50)
 
         assert len(pending_routes) == 2
         expect(footer).not_to_have_class(re.compile(r".*\bvisible\b.*"))
