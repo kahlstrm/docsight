@@ -207,5 +207,5 @@ jobs:
             args+=("$IMAGE@$digest")
           done
           docker buildx imagetools create "${args[@]}" --metadata-file "$RUNNER_TEMP/image-metadata.json"
-          digest=$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/image-metadata.json")
+          digest=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/image-metadata.json")
           echo "Published: \`$IMAGE@$digest\`" >> "$GITHUB_STEP_SUMMARY"
