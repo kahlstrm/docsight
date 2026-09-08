@@ -28,6 +28,8 @@ jobs:
         run: |
           docker run --rm --platform linux/arm64 --entrypoint python "$IMAGE" \
             -c 'import platform, struct; print(platform.machine(), struct.calcsize("P") * 8); assert struct.calcsize("P") == 8'
+      - name: Remove ARM64 image reference before pulling ARMv7
+        run: docker image rm "$IMAGE"
       - name: Test native ARMv7 container
         run: |
           docker run --rm --platform linux/arm/v7 --entrypoint python "$IMAGE" \
