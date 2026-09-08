@@ -15,6 +15,12 @@ on:
       - '.dockerignore'
       - 'entrypoint.sh'
       - '.github/workflows/docker.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/docker.yml'
+  schedule:
+    - cron: '41 5 * * 1'
   workflow_dispatch:
     inputs:
       no_cache:
@@ -31,7 +37,34 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install test dependencies
+        run: |
+          pip install --require-hashes -r requirements.txt
+          pip install --require-hashes -r requirements-test.txt
+          npm ci
+      - name: Verify application
+        run: |
+          python -m pytest tests/ -q --tb=short --ignore=tests/e2e
+          npm test
+          python scripts/i18n_check.py --validate
+
   build-and-push:
+    needs: verify
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -58,7 +91,8 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
             type=ref,event=tag
-            type=sha,enable=${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=long
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
@@ -76,6 +110,7 @@ jobs:
           fi
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
@@ -84,6 +119,14 @@ jobs:
           cache-from: type=gha,scope=docsight-image
           cache-to: type=gha,scope=docsight-image,mode=max
           no-cache: ${{ github.event_name == 'workflow_dispatch' && inputs.no_cache }}
+          pull: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: VERSION=${{ steps.version.outputs.tag }}
+
+      - name: Record published image
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "Published: \`$IMAGE@$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
