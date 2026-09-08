@@ -340,3 +340,38 @@ def test_production_startup_keeps_reserved_socket_through_app_main(
     serve_server(target, listener_socket=listener)
 
     assert observed == {"sockets": [listener], "threads": 4}
+
+
+def test_fritzbox_seed_preserves_samples_and_ignores_duplicates(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    from app.storage.segment_utilization import SegmentUtilizationStorage
+    from tests.e2e.support import application
+
+    now = datetime(2026, 1, 15, 12, tzinfo=timezone.utc)
+
+    class FrozenClock:
+        @staticmethod
+        def now(tz):
+            return now
+
+    monkeypatch.setattr(application, "datetime", FrozenClock)
+    db_path = str(tmp_path / "segment.db")
+    application.seed_fritzbox_segment_data(db_path)
+    storage = SegmentUtilizationStorage(db_path)
+    samples = storage.get_range("2026-01-13T12:00:00Z", "2026-01-15T12:00:00Z")
+
+    assert len(samples) == 2880
+    assert [row["timestamp"] for row in samples] == [
+        (now - timedelta(minutes=2880 - i)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        for i in range(2880)
+    ]
+    assert samples[0] == {
+        "timestamp": "2026-01-13T12:00:00Z",
+        "ds_total": 29.2, "us_total": 5.5, "ds_own": 1.42, "us_own": 0.16,
+    }
+    assert all(0 <= row["ds_own"] <= row["ds_total"] for row in samples)
+    assert all(0 <= row["us_own"] <= row["us_total"] for row in samples)
+
+    application.seed_fritzbox_segment_data(db_path)
+    assert storage.get_range("2026-01-13T12:00:00Z", "2026-01-15T12:00:00Z") == samples

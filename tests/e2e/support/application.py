@@ -61,10 +61,12 @@ def seed_fritzbox_segment_data(db_path: str) -> None:
     """Seed 48 hours of deterministic one-minute utilization samples."""
 
     from app.storage.segment_utilization import SegmentUtilizationStorage
+    from app.storage.sqlite import bulk_write
 
-    segment_storage = SegmentUtilizationStorage(db_path)
+    SegmentUtilizationStorage(db_path)
     now = datetime.now(timezone.utc)
     generator = random.Random(42)
+    rows = []
     for index in range(2880):
         timestamp = (now - timedelta(minutes=2880 - index)).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
@@ -73,13 +75,19 @@ def seed_fritzbox_segment_data(db_path: str) -> None:
         upstream_total = 8.0 + generator.uniform(-3, 15)
         downstream_own = downstream_total * generator.uniform(0.01, 0.15)
         upstream_own = upstream_total * generator.uniform(0.01, 0.10)
-        segment_storage.save_at(
+        rows.append((
             timestamp,
             round(downstream_total, 1),
             round(upstream_total, 1),
             round(downstream_own, 2),
             round(upstream_own, 2),
-        )
+        ))
+    bulk_write(
+        db_path,
+        "INSERT OR IGNORE INTO segment_utilization "
+        "(timestamp, ds_total, us_total, ds_own, us_own) VALUES (?, ?, ?, ?, ?)",
+        rows,
+    )
 
 
 def serve_server(
