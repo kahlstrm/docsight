@@ -389,7 +389,7 @@ def test_uv_installs_keep_hash_checks_and_explicit_python(name):
 
 def test_container_preserves_platforms_and_keeps_uv_out_of_runtime():
     workflow = load_workflow("docker.yml")
-    build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("id") == "build")
+    build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("name") == "Build and push")
     assert build["with"]["platforms"] == "linux/amd64,linux/arm64,linux/arm/v7"
     builder, runtime = (ROOT / "Dockerfile").read_text().split("# --- runtime stage:")
     assert "--only-binary=:all: --require-hashes -r requirements-uv.txt" in builder
@@ -401,7 +401,7 @@ def test_container_preserves_platforms_and_keeps_uv_out_of_runtime():
 
 def test_image_cache_covers_builder_layers_and_allows_manual_refresh():
     workflow = load_workflow("docker.yml")
-    build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("id") == "build")
+    build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("name") == "Build and push")
     options = build["with"]
     assert options["cache-from"] == "type=gha,scope=docsight-image"
     assert options["cache-to"] == "type=gha,scope=docsight-image,mode=max"
