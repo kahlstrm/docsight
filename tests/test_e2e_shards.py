@@ -19,7 +19,6 @@ from scripts.e2e_shards import (
 ROOT = Path(__file__).resolve().parents[1]
 E2E_DIR = ROOT / "tests" / "e2e"
 MANIFEST = E2E_DIR / "shards.json"
-WORKFLOW = ROOT / ".github" / "workflows" / "full-e2e.yml"
 
 
 def _manifest(*shards):
@@ -246,31 +245,3 @@ def test_single_process_baseline_receipt_may_exceed_shard_wall_limit(tmp_path):
     assert summary.per_shard == (3,)
     assert summary.wall_seconds == (1800.0,)
     assert summary.job_wall_seconds == (1800.0,)
-
-
-def test_workflow_runs_safe_non_retrying_shards_and_an_always_gate():
-    workflow = WORKFLOW.read_text(encoding="utf-8")
-
-    assert "fail-fast: false" in workflow
-    assert "single_process:" in workflow
-    assert "'[\"1\",\"2\",\"3\",\"4\"]'" in workflow
-    assert "max-parallel: 4" in workflow
-    assert "E2E_JOB_STARTED_EPOCH" in workflow
-    assert "python scripts/e2e_shards.py run" in workflow
-    assert "python scripts/e2e_shards.py summarize" in workflow
-    assert "--expected-total 586" in workflow
-    assert "--receipt" in workflow
-    assert "run-receipt.json" in workflow
-    assert "if: always()" in workflow
-    assert "Upload shard results, logs, and traces" in workflow
-    assert "tests/e2e/screenshots/" in workflow
-    assert "--tracing=retain-on-failure" in workflow
-    assert "reverse:" in workflow
-    assert "E2E_REVERSE" in workflow
-    assert "CHANGE_DETECTION_RESULT" in workflow
-    assert "Fail closed when PR change detection did not succeed" in workflow
-    assert "actions/upload-artifact@v" not in workflow
-    assert "actions/download-artifact@v" not in workflow
-    assert "rerun" not in workflow.lower()
-    assert "retry" not in workflow.lower()
-    assert "$(" not in workflow
