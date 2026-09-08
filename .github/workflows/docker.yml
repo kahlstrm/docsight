@@ -37,9 +37,20 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.tag }}
     permissions:
       contents: read
     steps:
+      - name: Get version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$(date -u +%Y-%m-%d).${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -68,7 +79,23 @@ jobs:
   build-and-push:
     needs: verify
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+            bits: 64
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            bits: 64
+          - arch: armv7
+            platform: linux/arm/v7
+            runner: ubuntu-24.04-arm
+            bits: 32
     permissions:
       contents: read
       packages: write
@@ -86,6 +113,75 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=docsight-native-${{ matrix.arch }}
+          cache-to: type=gha,scope=docsight-native-${{ matrix.arch }},mode=max
+          no-cache: ${{ github.event_name == 'workflow_dispatch' && inputs.no_cache }}
+          pull: true
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.verify.outputs.version }}
+          build-args: VERSION=${{ needs.verify.outputs.version }}
+
+      - name: Smoke-test native image and save digest
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          PLATFORM: ${{ matrix.platform }}
+          ARCH: ${{ matrix.arch }}
+          EXPECTED_BITS: ${{ matrix.bits }}
+        run: |
+          if [ -f /proc/sys/fs/binfmt_misc/status ]; then
+            echo 0 | sudo tee /proc/sys/fs/binfmt_misc/status
+          fi
+          docker run --rm --platform "$PLATFORM" --entrypoint python -e EXPECTED_BITS "$IMAGE@$DIGEST" \
+            -c 'import os, struct, flask, cryptography; assert struct.calcsize("P") * 8 == int(os.environ["EXPECTED_BITS"]); print("Native application imports passed")'
+          mkdir -p "$RUNNER_TEMP/digests"
+          echo "$DIGEST" > "$RUNNER_TEMP/digests/$ARCH"
+
+      - name: Upload image digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+  publish:
+    needs: build-and-push
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download image digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: image-digest-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/digests
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
@@ -97,39 +193,21 @@ jobs:
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=long
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
-
-      - name: Get version
-        id: version
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=v$(date -u +%Y-%m-%d).${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          cache-from: type=gha,scope=docsight-image
-          cache-to: type=gha,scope=docsight-image,mode=max
-          no-cache: ${{ github.event_name == 'workflow_dispatch' && inputs.no_cache }}
-          pull: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: VERSION=${{ steps.version.outputs.tag }}
-
-      - name: Record published image
+      - name: Publish combined image
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          METADATA: ${{ steps.meta.outputs.json }}
         run: |
-          echo "Published: \`$IMAGE@$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
+          args=()
+          mapfile -t tags < <(jq -r '.tags[]' <<< "$METADATA")
+          for tag in "${tags[@]}"; do
+            args+=(--tag "$tag")
+          done
+          for arch in amd64 arm64 armv7; do
+            digest=$(cat "$RUNNER_TEMP/digests/$arch")
+            [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+            args+=("$IMAGE@$digest")
+          done
+          docker buildx imagetools create "${args[@]}" --metadata-file "$RUNNER_TEMP/image-metadata.json"
+          digest=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/image-metadata.json")
+          echo "Published: \`$IMAGE@$digest\`" >> "$GITHUB_STEP_SUMMARY"
