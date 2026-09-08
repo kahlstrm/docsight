@@ -26,3 +26,19 @@ def test_api_tokens_cannot_access_backup_operations(secured_app, method, path):
     response = app.test_client().open(path, method=method,
                                      headers={'Authorization': 'Bearer ' + token})
     assert response.status_code in (302, 403)
+
+
+def test_browser_admin_can_download_and_validate_backups(secured_app):
+    import io
+    app, _ = secured_app
+    client = app.test_client()
+    client.get('/login')
+    with client.session_transaction() as session:
+        csrf = session['login_csrf_token']
+    assert client.post('/login', data={'password': 'synthetic-admin', 'csrf_token': csrf}).status_code == 302
+    backup = client.post('/api/backup')
+    assert backup.status_code == 200
+    validation = client.post('/api/restore/validate', data={'file': (io.BytesIO(backup.data), 'test.tar.gz')})
+    assert validation.status_code == 200
+    assert validation.get_json()['valid'] is True
+    backup.close()
