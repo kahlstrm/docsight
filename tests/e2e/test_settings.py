@@ -5,6 +5,8 @@ import re
 import pytest
 from playwright.sync_api import expect
 
+from tests.e2e.support.signal_trends import wait_count
+
 
 def _login(auth_page, auth_server):
     auth_page.goto(f"{auth_server}/login")
@@ -1026,7 +1028,7 @@ class TestSettingsInstantToggleSave:
         with settings_page.expect_request("**/api/config"):
             pending_routes[0].fulfill(json={"success": True})
 
-        assert len(pending_routes) == 2
+        wait_count(settings_page, pending_routes, 2)
         expect(footer).not_to_have_class(re.compile(r".*\bvisible\b.*"))
         pending_routes[1].fulfill(json={"success": True})
         expect(footer).not_to_have_class(re.compile(r".*\bvisible\b.*"))
