@@ -380,7 +380,7 @@ def test_uv_installs_keep_hash_checks_and_explicit_python(name):
         for script in installs:
             for command in script.splitlines():
                 if "uv pip install" in command:
-                    assert "--python python" in command
+                    assert "--system --python python" in command
                     assert "--compile-bytecode" in command
                     if "-r " in command:
                         assert "--require-hashes" in command

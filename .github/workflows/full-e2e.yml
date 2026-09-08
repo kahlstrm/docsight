@@ -121,9 +121,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install --python python --compile-bytecode --require-hashes -r requirements.txt
-          uv pip install --python python --compile-bytecode --require-hashes -r requirements-test.txt
-          uv pip install --python python --compile-bytecode pytest-playwright==0.7.2 playwright==1.58.0
+          uv pip install --system --python python --compile-bytecode --require-hashes -r requirements.txt
+          uv pip install --system --python python --compile-bytecode --require-hashes -r requirements-test.txt
+          uv pip install --system --python python --compile-bytecode pytest-playwright==0.7.2 playwright==1.58.0
           python -m playwright install --with-deps chromium
 
       - name: Validate and collect shard

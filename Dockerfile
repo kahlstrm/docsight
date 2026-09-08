@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements-uv.txt .
 RUN pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements-uv.txt
 COPY requirements.txt .
-RUN uv pip install --python /usr/local/bin/python --no-cache --compile-bytecode \
+RUN uv pip install --system --python /usr/local/bin/python --no-cache --compile-bytecode \
     --require-hashes --prefix=/install -r requirements.txt
 COPY tools/icmp_probe_helper.c /build/icmp_probe_helper.c
 COPY tools/traceroute_helper.c /build/traceroute_helper.c
