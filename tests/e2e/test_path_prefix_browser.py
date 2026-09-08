@@ -118,6 +118,9 @@ def test_browser_urls_stay_within_root_or_docsight_mount(page, path_prefix_serve
     assert export_href is not None
     assert urlsplit(export_href).path.startswith(f"{mount_path}/api/")
 
+    # Finish module requests before unloading the dashboard; otherwise navigation
+    # aborts fetches and their error handlers pollute the console assertion below.
+    page.wait_for_load_state("networkidle")
     page.goto(f"{app_url}/settings", wait_until="domcontentloaded")
     assert page.evaluate("docsightUrl('/api/config')") == f"{mount_path}/api/config"
     snapshot_urls()
