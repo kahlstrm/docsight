@@ -105,7 +105,6 @@ class TestGlossaryModulation:
 
     def test_modulation_kpi_has_glossary_hints(self, demo_page):
         demo_page.locator('.nav-item[data-view="modulation"]').click()
-        demo_page.wait_for_timeout(2000)
         hints = demo_page.locator('#view-modulation .glossary-hint')
         assert hints.count() >= 4, f"Expected at least 4 modulation glossary hints, got {hints.count()}"
 
@@ -123,7 +122,6 @@ class TestGlossaryModulation:
 
     def test_health_index_popover(self, demo_page):
         demo_page.locator('.nav-item[data-view="modulation"]').click()
-        demo_page.wait_for_timeout(2000)
         hint = demo_page.locator('#view-modulation .glossary-hint').first
         hint.click()
         expect(demo_page.locator(POPOVER)).to_be_visible()

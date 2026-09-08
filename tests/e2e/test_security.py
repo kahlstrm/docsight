@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from playwright.sync_api import expect
 
 
 # ── Fix 1: SSRF URL Validation ──
@@ -75,7 +76,6 @@ class TestSSRFUrlValidation:
                 window.__badUrlStatus = resp.status;
             })();
         """)
-        settings_page.wait_for_timeout(1000)
         status = settings_page.evaluate("window.__badUrlStatus")
         assert status == 400
         # Reload settings page and check the modem_url field still has safe value
@@ -100,7 +100,6 @@ class TestSSRFUrlValidation:
                 window.__ssrfTestResult = data;
             });
         """)
-        settings_page.wait_for_timeout(1000)
         result = settings_page.evaluate("window.__ssrfTestResult")
         assert result["success"] is False
         assert "error" in result
@@ -138,7 +137,6 @@ class TestXSSNoScriptExecution:
         demo_page.on("pageerror", lambda err: errors.append(str(err)))
         demo_page.reload()
         demo_page.wait_for_load_state("networkidle")
-        demo_page.wait_for_timeout(2000)
         escape_errors = [e for e in errors if "escapeHtml" in e or "undefined" in e.lower()]
         assert len(escape_errors) == 0, f"JS errors on dashboard: {escape_errors}"
 
@@ -147,7 +145,7 @@ class TestXSSNoScriptExecution:
         errors = []
         demo_page.on("pageerror", lambda err: errors.append(str(err)))
         demo_page.locator('.nav-item[data-view="speedtest"]').click()
-        demo_page.wait_for_timeout(2000)
+        expect(demo_page.locator("#speedtest-tbody .st-expand-btn").first).to_be_visible()
         escape_errors = [e for e in errors if "escapeHtml" in e or "undefined" in e.lower()]
         assert len(escape_errors) == 0, f"JS errors on speedtest: {escape_errors}"
 
@@ -156,7 +154,7 @@ class TestXSSNoScriptExecution:
         errors = []
         demo_page.on("pageerror", lambda err: errors.append(str(err)))
         demo_page.locator('.nav-item[data-view="channels"]').click()
-        demo_page.wait_for_timeout(1500)
+        expect(demo_page.locator("#channel-select option").nth(1)).to_be_attached()
         escape_errors = [e for e in errors if "escapeHtml" in e or "undefined" in e.lower()]
         assert len(escape_errors) == 0, f"JS errors on channels: {escape_errors}"
 
@@ -165,7 +163,7 @@ class TestXSSNoScriptExecution:
         errors = []
         demo_page.on("pageerror", lambda err: errors.append(str(err)))
         demo_page.locator('.nav-item[data-view="correlation"]').click()
-        demo_page.wait_for_timeout(2000)
+        expect(demo_page.locator("#correlation-chart-container")).to_be_visible()
         escape_errors = [e for e in errors if "escapeHtml" in e or "undefined" in e.lower()]
         assert len(escape_errors) == 0, f"JS errors on correlation: {escape_errors}"
 
@@ -174,7 +172,7 @@ class TestXSSNoScriptExecution:
         errors = []
         demo_page.on("pageerror", lambda err: errors.append(str(err)))
         demo_page.locator('.nav-item[data-view="bnetz"]').click()
-        demo_page.wait_for_timeout(2000)
+        expect(demo_page.locator("#bnetz-tbody tr").first).to_be_visible()
         escape_errors = [e for e in errors if "escapeHtml" in e or "undefined" in e.lower()]
         assert len(escape_errors) == 0, f"JS errors on bnetz: {escape_errors}"
 
@@ -183,7 +181,8 @@ class TestXSSNoScriptExecution:
         errors = []
         demo_page.on("pageerror", lambda err: errors.append(str(err)))
         demo_page.locator('.nav-item[data-view="bqm"]').click()
-        demo_page.wait_for_timeout(2000)
+        demo_page.locator(".bqm-day.has-data").last.click()
+        expect(demo_page.locator("#bqm-card")).to_be_visible()
         escape_errors = [e for e in errors if "escapeHtml" in e or "undefined" in e.lower()]
         assert len(escape_errors) == 0, f"JS errors on bqm: {escape_errors}"
 
@@ -194,14 +193,14 @@ class TestSpeedtestTableEscaping:
     def test_speedtest_table_renders(self, demo_page):
         """Speedtest table should render with data."""
         demo_page.locator('.nav-item[data-view="speedtest"]').click()
-        demo_page.wait_for_timeout(2000)
+        expect(demo_page.locator("#speedtest-tbody .st-expand-btn").first).to_be_visible()
         rows = demo_page.locator("#speedtest-tbody tr")
         assert rows.count() > 0, "Speedtest table should have rows"
 
     def test_speedtest_values_not_html(self, demo_page):
         """Ping/jitter cells should contain plain text, not raw HTML."""
         demo_page.locator('.nav-item[data-view="speedtest"]').click()
-        demo_page.wait_for_timeout(2000)
+        expect(demo_page.locator("#speedtest-tbody .st-expand-btn").first).to_be_visible()
         cells = demo_page.locator("#speedtest-tbody td")
         for i in range(min(cells.count(), 40)):
             text = cells.nth(i).inner_html()
@@ -244,7 +243,7 @@ class TestCorrelationTooltipEscaping:
     def test_correlation_view_renders(self, demo_page):
         """Correlation view should render (raw canvas element)."""
         demo_page.locator('.nav-item[data-view="correlation"]').click()
-        demo_page.wait_for_timeout(3000)
+        expect(demo_page.locator("#correlation-chart-container")).to_be_visible()
         # The correlation chart IS a canvas element with id="correlation-chart"
         chart = demo_page.locator("canvas#correlation-chart")
         assert chart.count() > 0, "Correlation chart canvas should exist"
@@ -259,37 +258,16 @@ class TestChannelCompareChipEscaping:
     def test_compare_add_channel(self, demo_page):
         """Adding a channel to compare should render an escaped chip."""
         demo_page.locator('.nav-item[data-view="channels"]').click()
-        demo_page.wait_for_timeout(500)
+        expect(demo_page.locator("#channel-select option").nth(1)).to_be_attached()
 
-        # Switch to compare mode
-        compare_tab = demo_page.locator(
-            '.channel-mode-tab[data-mode="compare"], '
-            '.trend-tab[data-value="compare"]'
-        )
-        if compare_tab.count() > 0:
-            compare_tab.first.click()
-            demo_page.wait_for_timeout(500)
-
-            # Select a channel from the dropdown
-            sel = demo_page.locator("#compare-channel-select")
-            if sel.count() > 0:
-                options = sel.locator("option")
-                if options.count() > 1:
-                    sel.select_option(index=1)
-                    demo_page.wait_for_timeout(200)
-                    # Click "Add" button
-                    add_btn = demo_page.locator(
-                        "#compare-add-btn, .compare-add-btn, "
-                        "button[onclick*='addCompareChannel']"
-                    )
-                    if add_btn.count() > 0:
-                        add_btn.first.click()
-                        demo_page.wait_for_timeout(1000)
-                        chips = demo_page.locator("#compare-chips .compare-chip")
-                        assert chips.count() > 0, "Compare chip should appear"
-                        # Verify chip text does not contain raw HTML
-                        chip_html = chips.first.inner_html()
-                        assert "<script" not in chip_html.lower()
+        demo_page.locator('.trend-tab[data-value="compare"]').click()
+        select = demo_page.locator("#compare-channel-select")
+        expect(select.locator("option").nth(1)).to_be_attached()
+        select.select_option(index=1)
+        demo_page.locator("#compare-add-btn").click()
+        chips = demo_page.locator("#compare-chips .compare-chip")
+        expect(chips.first).to_be_visible()
+        assert "<script" not in chips.first.inner_html().lower()
 
 
 class TestBnetzTableEscaping:
@@ -298,14 +276,9 @@ class TestBnetzTableEscaping:
     def test_bnetz_data_renders(self, demo_page):
         """BNetzA measurements should render (demo mode has sample data)."""
         demo_page.locator('.nav-item[data-view="bnetz"]').click()
-        demo_page.wait_for_timeout(2000)
-        tbody = demo_page.locator("#bnetz-tbody")
-        if tbody.count() > 0:
-            rows = tbody.locator("tr")
-            if rows.count() > 0:
-                # Check the provider cell for no raw HTML
-                first_row_html = rows.first.inner_html()
-                assert "<script" not in first_row_html.lower()
+        expect(demo_page.locator("#bnetz-tbody tr").first).to_be_visible()
+        first_row_html = demo_page.locator("#bnetz-tbody tr").first.inner_html()
+        assert "<script" not in first_row_html.lower()
 
     def test_bnetz_api_markup_is_rendered_only_as_text(self, demo_page):
         marker = '<img src=x onerror="window.__bnetzDomXss = true">'
@@ -340,6 +313,7 @@ class TestBnetzTableEscaping:
         demo_page.evaluate("window.__bnetzDomXss = false")
 
         demo_page.locator('.nav-item[data-view="bnetz"]').click()
+        expect(demo_page.locator("#bnetz-tbody tr").first).to_be_visible()
         row = demo_page.locator("#bnetz-tbody tr[data-bnetz-idx]").first
         row.wait_for(state="visible")
 

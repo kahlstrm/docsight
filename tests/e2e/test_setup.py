@@ -344,7 +344,8 @@ class TestOneClickDemo:
             "button", name="Try again"
         )
         expect(retry).to_be_visible()
-        retry.click()
-        page.wait_for_timeout(750)
+        with page.expect_response("**/health") as health_response:
+            retry.click()
+        health_response.value.finished()
 
         assert len(start_requests) == 1

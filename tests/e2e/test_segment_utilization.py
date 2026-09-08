@@ -8,6 +8,7 @@ integration, and JS error-free operation.
 import re
 
 import pytest
+from playwright.sync_api import expect
 
 
 # ── Helpers ──
@@ -16,7 +17,7 @@ import pytest
 def navigate_to_segment(page):
     """Switch to Segment Utilization view and wait for data to load."""
     page.locator('.nav-item[data-view="segment-utilization"]').click()
-    page.wait_for_timeout(2000)
+    wait_for_content(page)
 
 
 def wait_for_content(page, timeout=5000):
@@ -55,7 +56,6 @@ class TestSegmentNavigation:
     def test_view_hidden_when_on_other_tab(self, fritzbox_page):
         """Segment view should be hidden when another tab is active."""
         fritzbox_page.locator('.nav-item[data-view="live"]').click()
-        fritzbox_page.wait_for_timeout(300)
         view = fritzbox_page.locator("#view-segment-utilization")
         assert not view.is_visible()
 
@@ -69,7 +69,6 @@ class TestSegmentLoading:
     def test_skeleton_hidden_after_load(self, fritzbox_page):
         """Skeleton should disappear after data loads."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         skeleton = fritzbox_page.locator("#fritz-cable-skeleton")
         display = skeleton.evaluate("el => getComputedStyle(el).display")
         assert display == "none"
@@ -77,14 +76,12 @@ class TestSegmentLoading:
     def test_content_visible_after_load(self, fritzbox_page):
         """Main content should be visible after data loads."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         content = fritzbox_page.locator("#fritz-cable-content")
         assert content.is_visible()
 
     def test_error_message_hidden_with_data(self, fritzbox_page):
         """Error message should not be visible when data exists."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         msg = fritzbox_page.locator("#fritz-cable-message")
         display = msg.evaluate("el => getComputedStyle(el).display")
         assert display == "none"
@@ -99,7 +96,6 @@ class TestSegmentKPIs:
     def test_ds_total_shows_percentage(self, fritzbox_page):
         """Downstream total KPI should show a percentage value."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         ds = fritzbox_page.locator("#fritz-cable-ds-total")
         text = ds.text_content().strip()
         assert text.endswith("%"), f"DS total should be a percentage, got: {text}"
@@ -108,7 +104,6 @@ class TestSegmentKPIs:
     def test_us_total_shows_percentage(self, fritzbox_page):
         """Upstream total KPI should show a percentage value."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         us = fritzbox_page.locator("#fritz-cable-us-total")
         text = us.text_content().strip()
         assert text.endswith("%"), f"US total should be a percentage, got: {text}"
@@ -116,7 +111,6 @@ class TestSegmentKPIs:
     def test_status_shows_collecting(self, fritzbox_page):
         """Status KPI should show 'Collecting' when data exists."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         status = fritzbox_page.locator("#fritz-cable-status")
         text = status.text_content().strip()
         assert text != "-" and text != "", f"Status should not be empty, got: {text}"
@@ -124,7 +118,6 @@ class TestSegmentKPIs:
     def test_ds_stats_shows_min_avg_max(self, fritzbox_page):
         """DS stats line should show min/avg/max values."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         stats = fritzbox_page.locator("#fritz-cable-ds-stats")
         text = stats.text_content().strip()
         assert "%" in text, f"DS stats should contain percentages, got: {text}"
@@ -132,7 +125,6 @@ class TestSegmentKPIs:
     def test_us_stats_shows_min_avg_max(self, fritzbox_page):
         """US stats line should show min/avg/max values."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         stats = fritzbox_page.locator("#fritz-cable-us-stats")
         text = stats.text_content().strip()
         assert "%" in text, f"US stats should contain percentages, got: {text}"
@@ -140,7 +132,6 @@ class TestSegmentKPIs:
     def test_sample_count_shown(self, fritzbox_page):
         """Sample count should be displayed."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         count = fritzbox_page.locator("#fritz-cable-count")
         text = count.text_content().strip()
         assert "samples" in text.lower(), f"Count should mention samples, got: {text}"
@@ -155,7 +146,6 @@ class TestSegmentCharts:
     def test_ds_chart_renders_uplot(self, fritzbox_page):
         """Downstream chart should render a uPlot instance."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         fritzbox_page.wait_for_selector("#fritz-cable-ds-chart .uplot", timeout=5000)
         canvases = fritzbox_page.locator("#fritz-cable-ds-chart .uplot canvas").count()
         assert canvases >= 1, "DS chart should have at least one canvas"
@@ -163,7 +153,6 @@ class TestSegmentCharts:
     def test_us_chart_renders_uplot(self, fritzbox_page):
         """Upstream chart should render a uPlot instance."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         fritzbox_page.wait_for_selector("#fritz-cable-us-chart .uplot", timeout=5000)
         canvases = fritzbox_page.locator("#fritz-cable-us-chart .uplot canvas").count()
         assert canvases >= 1, "US chart should have at least one canvas"
@@ -171,7 +160,6 @@ class TestSegmentCharts:
     def test_ds_chart_has_legend(self, fritzbox_page):
         """DS chart should have a uPlot legend with series."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         fritzbox_page.wait_for_selector("#fritz-cable-ds-chart .uplot", timeout=5000)
         legend = fritzbox_page.locator("#fritz-cable-ds-chart .u-legend")
         assert legend.count() > 0, "DS chart should have a legend"
@@ -179,7 +167,6 @@ class TestSegmentCharts:
     def test_us_chart_has_legend(self, fritzbox_page):
         """US chart should have a uPlot legend with series."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         fritzbox_page.wait_for_selector("#fritz-cable-us-chart .uplot", timeout=5000)
         legend = fritzbox_page.locator("#fritz-cable-us-chart .u-legend")
         assert legend.count() > 0, "US chart should have a legend"
@@ -187,7 +174,6 @@ class TestSegmentCharts:
     def test_chart_has_nonzero_dimensions(self, fritzbox_page):
         """Chart canvas should have meaningful dimensions."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         fritzbox_page.wait_for_selector("#fritz-cable-ds-chart .uplot", timeout=5000)
         canvas = fritzbox_page.locator("#fritz-cable-ds-chart .uplot canvas").first
         box = canvas.bounding_box()
@@ -205,17 +191,14 @@ class TestSegmentRangeTabs:
     def test_all_range_active_by_default(self, fritzbox_page):
         """'All' range tab should be active by default."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         all_tab = fritzbox_page.locator('#fritz-cable-range-tabs .trend-tab[data-range="all"]')
         assert "active" in all_tab.get_attribute("class")
 
     def test_switch_to_24h(self, fritzbox_page):
         """Clicking 24h tab should reload charts and activate the tab."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         tab = fritzbox_page.locator('#fritz-cable-range-tabs .trend-tab[data-range="24h"]')
         tab.click()
-        fritzbox_page.wait_for_timeout(2000)
         assert "active" in tab.get_attribute("class")
         # Charts should still be rendered
         canvases = fritzbox_page.locator("#fritz-cable-ds-chart .uplot canvas").count()
@@ -224,27 +207,21 @@ class TestSegmentRangeTabs:
     def test_switch_to_7d(self, fritzbox_page):
         """Clicking 7d tab should reload and activate."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         tab = fritzbox_page.locator('#fritz-cable-range-tabs .trend-tab[data-range="7d"]')
         tab.click()
-        fritzbox_page.wait_for_timeout(2000)
         assert "active" in tab.get_attribute("class")
 
     def test_switch_to_30d(self, fritzbox_page):
         """Clicking 30d tab should reload and activate."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         tab = fritzbox_page.locator('#fritz-cable-range-tabs .trend-tab[data-range="30d"]')
         tab.click()
-        fritzbox_page.wait_for_timeout(2000)
         assert "active" in tab.get_attribute("class")
 
     def test_only_one_tab_active_at_a_time(self, fritzbox_page):
         """Only one range tab should be active at any time."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         fritzbox_page.locator('#fritz-cable-range-tabs .trend-tab[data-range="24h"]').click()
-        fritzbox_page.wait_for_timeout(1000)
         active_tabs = fritzbox_page.locator("#fritz-cable-range-tabs .trend-tab.active")
         assert active_tabs.count() == 1, f"Expected 1 active tab, got {active_tabs.count()}"
 
@@ -325,7 +302,6 @@ class TestSegmentI18n:
         page.goto(f"{fritzbox_server}/?lang=en")
         page.wait_for_load_state("networkidle")
         navigate_to_segment(page)
-        wait_for_content(page)
         title = page.locator(".fritz-cable-title")
         assert "Segment" in title.text_content()
 
@@ -334,7 +310,6 @@ class TestSegmentI18n:
         page.goto(f"{fritzbox_server}/?lang=de")
         page.wait_for_load_state("networkidle")
         navigate_to_segment(page)
-        wait_for_content(page)
         title = page.locator(".fritz-cable-title")
         text = title.text_content()
         assert "Segment" in text or "Auslastung" in text
@@ -352,7 +327,6 @@ class TestSegmentI18n:
         page.goto(f"{fritzbox_server}/?lang=de")
         page.wait_for_load_state("networkidle")
         navigate_to_segment(page)
-        wait_for_content(page)
         labels = page.locator(".fritz-cable-kpi-label").all_text_contents()
         assert len(labels) == 3, f"Expected 3 KPI labels, got {len(labels)}"
         # Should NOT be the English fallbacks (unless same in DE)
@@ -369,9 +343,7 @@ class TestSegmentTheme:
     def test_charts_render_in_dark_mode(self, fritzbox_page):
         """Charts should render in dark mode."""
         fritzbox_page.evaluate("document.documentElement.setAttribute('data-theme', 'dark')")
-        fritzbox_page.wait_for_timeout(200)
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         fritzbox_page.wait_for_selector("#fritz-cable-ds-chart .uplot", timeout=5000)
         canvases = fritzbox_page.locator("#fritz-cable-ds-chart .uplot canvas").count()
         assert canvases >= 1
@@ -379,9 +351,7 @@ class TestSegmentTheme:
     def test_charts_render_in_light_mode(self, fritzbox_page):
         """Charts should render in light mode."""
         fritzbox_page.evaluate("document.documentElement.setAttribute('data-theme', 'light')")
-        fritzbox_page.wait_for_timeout(200)
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         fritzbox_page.wait_for_selector("#fritz-cable-ds-chart .uplot", timeout=5000)
         canvases = fritzbox_page.locator("#fritz-cable-ds-chart .uplot canvas").count()
         assert canvases >= 1
@@ -398,14 +368,14 @@ class TestSegmentCorrelation:
     def test_correlation_view_loads_for_fritzbox(self, fritzbox_page):
         """Correlation view should load without errors for FritzBox."""
         fritzbox_page.locator('.nav-item[data-view="correlation"]').click()
-        fritzbox_page.wait_for_timeout(2000)
+        expect(fritzbox_page.locator("#correlation-chart-container")).to_be_visible()
         view = fritzbox_page.locator("#view-correlation")
         assert view.is_visible()
 
     def test_correlation_legend_has_segment_entries(self, fritzbox_page):
         """Correlation legend should include Segment DS/US entries."""
         fritzbox_page.locator('.nav-item[data-view="correlation"]').click()
-        fritzbox_page.wait_for_timeout(3000)
+        expect(fritzbox_page.locator("#correlation-chart-container")).to_be_visible()
         legend = fritzbox_page.locator("#correlation-legend, .correlation-legend")
         if legend.count() > 0:
             text = legend.text_content()
@@ -414,7 +384,7 @@ class TestSegmentCorrelation:
     def test_correlation_defaults_disable_poor_signal_and_line_metrics_have_no_area_fill(self, fritzbox_page):
         """Poor Signal starts disabled and isolated line metrics render without area fills."""
         fritzbox_page.locator('.nav-item[data-view="correlation"]').click()
-        fritzbox_page.wait_for_timeout(3000)
+        expect(fritzbox_page.locator("#correlation-chart-container")).to_be_visible()
 
         poor_signal = fritzbox_page.locator('#correlation-legend span[data-metric="poorSignal"]')
         assert poor_signal.count() == 1
@@ -471,7 +441,7 @@ class TestSegmentCorrelation:
         errors = []
         fritzbox_page.on("pageerror", lambda err: errors.append(str(err)))
         fritzbox_page.locator('.nav-item[data-view="correlation"]').click()
-        fritzbox_page.wait_for_timeout(3000)
+        expect(fritzbox_page.locator("#correlation-chart-container")).to_be_visible()
 
         overlay = fritzbox_page.locator("canvas#correlation-overlay")
         box = overlay.bounding_box()
@@ -519,7 +489,6 @@ class TestSegmentCorrelation:
         fritzbox_page.mouse.move(
             box["x"] + modem_point["x"], box["y"] + box["height"] * 0.45
         )
-        fritzbox_page.wait_for_timeout(400)
 
         tooltip = fritzbox_page.locator("#correlation-tooltip")
         assert tooltip.is_visible(), "Correlation tooltip should appear on hover"
@@ -551,21 +520,18 @@ class TestSegmentViewStructure:
     def test_has_three_kpi_cards(self, fritzbox_page):
         """Should have 3 KPI cards."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         kpis = fritzbox_page.locator("#fritz-cable-content .fritz-cable-kpi")
         assert kpis.count() == 3
 
     def test_has_two_chart_panels(self, fritzbox_page):
         """Should have 2 chart panels (DS and US)."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         panels = fritzbox_page.locator("#fritz-cable-content .fritz-cable-panel")
         assert panels.count() == 2
 
     def test_has_note_section(self, fritzbox_page):
         """Should have a note/disclaimer section."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         note = fritzbox_page.locator(".fritz-cable-note")
         assert note.count() > 0
         text = note.text_content().strip()
@@ -588,7 +554,6 @@ class TestSegmentHashNavigation:
         """Navigating to /#segment-utilization should show the segment tab."""
         page.goto(f"{fritzbox_server}/#segment-utilization")
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2000)
         view = page.locator("#view-segment-utilization")
         assert view.is_visible()
 
@@ -612,18 +577,16 @@ class TestSegmentNoJSErrors:
         errors = []
         fritzbox_page.on("pageerror", lambda err: errors.append(str(err)))
         navigate_to_segment(fritzbox_page)
-        fritzbox_page.wait_for_timeout(3000)
         assert len(errors) == 0, f"JS errors on segment load: {errors}"
 
     def test_no_errors_on_range_switch(self, fritzbox_page):
         """Switching ranges should not produce JS errors."""
         navigate_to_segment(fritzbox_page)
-        wait_for_content(fritzbox_page)
         errors = []
         fritzbox_page.on("pageerror", lambda err: errors.append(str(err)))
         for rng in ["24h", "7d", "30d", "all"]:
             fritzbox_page.locator(f'#fritz-cable-range-tabs .trend-tab[data-range="{rng}"]').click()
-            fritzbox_page.wait_for_timeout(1500)
+            wait_for_content(fritzbox_page)
         assert len(errors) == 0, f"JS errors on range switch: {errors}"
 
     def test_no_errors_on_view_switching(self, fritzbox_page):
@@ -631,11 +594,8 @@ class TestSegmentNoJSErrors:
         errors = []
         fritzbox_page.on("pageerror", lambda err: errors.append(str(err)))
         navigate_to_segment(fritzbox_page)
-        fritzbox_page.wait_for_timeout(1500)
         fritzbox_page.locator('.nav-item[data-view="live"]').click()
-        fritzbox_page.wait_for_timeout(500)
         navigate_to_segment(fritzbox_page)
-        fritzbox_page.wait_for_timeout(1500)
         assert len(errors) == 0, f"JS errors on view switching: {errors}"
 
 
