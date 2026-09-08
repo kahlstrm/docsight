@@ -163,6 +163,10 @@ The matching `.sha256` release asset is available for optional integrity checks.
 See the [code signing policy](../../CODE_SIGNING.md) for the onboarding status,
 intended release scope, and verification guidance.
 
+Dependency installation uses uv, bootstrapped from the hash-pinned root
+`requirements-uv.txt` into the build virtual environment. No separate uv
+installation is required to run `build.ps1`.
+
 The build uses a Windows-resolved, hash-pinned runtime install from
 `requirements-runtime-windows.txt` and a cross-platform, hash-pinned build-tool
 install from `requirements-build.txt`. The generated `VERSION` file is bundled

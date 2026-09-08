@@ -42,6 +42,7 @@ DOCKER_PATHS = [
     "app/**",
     "tools/**",
     "requirements.txt",
+    "requirements-uv.txt",
     "Dockerfile",
     ".dockerignore",
     "entrypoint.sh",
@@ -187,7 +188,7 @@ def test_full_e2e_paths_concurrency_and_summary_contract():
         step for step in workflow["jobs"]["full-e2e"]["steps"]
         if step["name"].startswith("Verify complete successful")
     )["run"]
-    assert "--expected-total 585" in summarize
+    assert "--expected-total 586" in summarize
 
     preserve = next(
         step for step in workflow["jobs"]["full-e2e"]["steps"]
@@ -240,7 +241,8 @@ def test_docker_paths_tags_manual_and_concurrency_contract():
         "tags": ["v*"],
         "paths": DOCKER_PATHS,
     }
-    assert triggers["workflow_dispatch"] is None
+    assert triggers["workflow_dispatch"]["inputs"]["no_cache"]["type"] == "boolean"
+    assert triggers["workflow_dispatch"]["inputs"]["no_cache"]["default"] is False
     assert workflow["concurrency"] == {
         "group": "docker-${{ github.ref }}",
         "cancel-in-progress": "${{ github.ref == 'refs/heads/main' }}",
@@ -364,3 +366,45 @@ def test_changed_workflows_keep_every_action_sha_pinned(name):
     ]
     assert uses
     assert all(re.fullmatch(r"[^@]+@[0-9a-f]{40}", action) for action in uses)
+
+
+@pytest.mark.parametrize("name", ["docker.yml", "test.yml", "full-e2e.yml"])
+def test_uv_installs_keep_hash_checks_and_explicit_python(name):
+    for job in load_workflow(name)["jobs"].values():
+        steps = job.get("steps", [])
+        installs = [step["run"] for step in steps if "uv pip install" in step.get("run", "")]
+        if not installs:
+            continue
+        setup = next(step for step in steps if step.get("uses", "").startswith("astral-sh/setup-uv@"))
+        assert setup["with"]["version"] == "0.12.5"
+        assert setup["with"]["enable-cache"] is True
+        for script in installs:
+            for command in script.splitlines():
+                if "uv pip install" in command:
+                    assert "--system --python python" in command
+                    assert "--compile-bytecode" in command
+                    if "-r " in command:
+                        assert "--require-hashes" in command
+
+
+def test_container_preserves_platforms_and_keeps_uv_out_of_runtime():
+    workflow = load_workflow("docker.yml")
+    build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("name") == "Build and push")
+    assert build["with"]["platforms"] == "linux/amd64,linux/arm64,linux/arm/v7"
+    builder, runtime = (ROOT / "Dockerfile").read_text().split("# --- runtime stage:")
+    assert "--only-binary=:all: --require-hashes -r requirements-uv.txt" in builder
+    assert "--require-hashes --prefix=/install -r requirements.txt" in builder
+    assert "--prefix=/install -r requirements-uv.txt" not in builder
+    assert "COPY --from=builder /install /usr/local" in runtime
+    assert "uv pip install" not in runtime
+
+
+def test_image_cache_covers_builder_layers_and_allows_manual_refresh():
+    workflow = load_workflow("docker.yml")
+    build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("name") == "Build and push")
+    options = build["with"]
+    assert options["cache-from"] == "type=gha,scope=docsight-image"
+    assert options["cache-to"] == "type=gha,scope=docsight-image,mode=max"
+    assert options["no-cache"] == "${{ github.event_name == 'workflow_dispatch' && inputs.no_cache }}"
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    assert dockerfile.index("ARG VERSION=dev") > dockerfile.index("RUN chmod +x /entrypoint.sh")

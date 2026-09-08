@@ -37,8 +37,11 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for detailed technical documentation an
 ```bash
 git clone https://github.com/itsDNNS/docsight.git
 cd docsight
-python -m pip install --require-hashes -r requirements.txt
-python -m pip install --require-hashes -r requirements-test.txt
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --only-binary=:all: --require-hashes -r requirements-uv.txt
+uv pip install --python python --compile-bytecode --require-hashes -r requirements.txt
+uv pip install --python python --compile-bytecode --require-hashes -r requirements-test.txt
 ```
 
 ## Docker Development
@@ -66,7 +69,7 @@ The Python suite covers analyzers, collectors, drivers, event detection, API end
 Install the browser test dependencies before running this suite:
 
 ```bash
-python -m pip install pytest-playwright==0.7.2 playwright==1.58.0
+uv pip install --python python --compile-bytecode pytest-playwright==0.7.2 playwright==1.58.0
 python -m playwright install chromium
 ```
 

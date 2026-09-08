@@ -94,9 +94,9 @@ if ($LASTEXITCODE -ne 0 -or $PointerSize -ne "8") {
 Invoke-Checked $VenvPython $VersionScript --label=$ResolvedVersion --output $VersionInfoFile
 [System.IO.File]::WriteAllText($VersionFile, "$ResolvedVersion`n", [System.Text.UTF8Encoding]::new($false))
 
-Invoke-Checked $VenvPython -m pip install --upgrade pip
-Invoke-Checked $VenvPython -m pip install --require-hashes -r (Join-Path $ScriptDir "requirements-runtime-windows.txt")
-Invoke-Checked $VenvPython -m pip install --require-hashes -r (Join-Path $ScriptDir "requirements-build.txt")
+Invoke-Checked $VenvPython -m pip install --only-binary=:all: --require-hashes -r (Join-Path $RepoRoot "requirements-uv.txt")
+Invoke-Checked $VenvPython -m uv pip install --python $VenvPython --compile-bytecode --require-hashes -r (Join-Path $ScriptDir "requirements-runtime-windows.txt")
+Invoke-Checked $VenvPython -m uv pip install --python $VenvPython --compile-bytecode --require-hashes -r (Join-Path $ScriptDir "requirements-build.txt")
 
 if (Test-Path $BundleDir) {
     Remove-Item -Recurse -Force $BundleDir

@@ -8,8 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
+COPY requirements-uv.txt .
+RUN pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements-uv.txt
 COPY requirements.txt .
-RUN pip install --no-cache-dir --require-hashes --prefix=/install -r requirements.txt
+RUN uv pip install --system --python /usr/local/bin/python --no-cache --compile-bytecode \
+    --require-hashes --prefix=/install -r requirements.txt
 COPY tools/icmp_probe_helper.c /build/icmp_probe_helper.c
 COPY tools/traceroute_helper.c /build/traceroute_helper.c
 RUN mkdir -p /build/out && \
@@ -18,9 +21,7 @@ RUN mkdir -p /build/out && \
 
 # --- runtime stage: slim final image ---
 FROM python:3.13-slim@sha256:739e7213785e88c0f702dcdc12c0973afcbd606dbf021a589cab77d6b00b579d
-ARG VERSION=dev
 WORKDIR /app
-RUN echo "${VERSION}" > /app/VERSION
 
 COPY --from=builder /install /usr/local
 COPY --from=builder /build/out/docsight-icmp-helper /usr/local/bin/docsight-icmp-helper
@@ -42,6 +43,8 @@ RUN adduser --disabled-password --gecos "" --uid 1000 appuser && \
 COPY app/ ./app/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+ARG VERSION=dev
+RUN echo "${VERSION}" > /app/VERSION
 HEALTHCHECK --interval=60s --timeout=5s --retries=3 \
     CMD ["python", "-m", "app.healthcheck"]
 ENTRYPOINT ["/entrypoint.sh"]
