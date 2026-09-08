@@ -151,7 +151,6 @@ class TestModulationTabStructure:
     @pytest.fixture(autouse=True)
     def navigate_to_modulation(self, demo_page):
         demo_page.locator('.nav-item[data-view="modulation"]').click()
-        demo_page.wait_for_timeout(500)
         self.page = demo_page
 
     def test_has_title(self):
@@ -392,7 +391,6 @@ class TestModulationKPIs:
     @pytest.fixture(autouse=True)
     def navigate_to_modulation(self, demo_page):
         demo_page.locator('.nav-item[data-view="modulation"]').click()
-        demo_page.wait_for_timeout(1500)
         self.page = demo_page
 
     def test_health_index_populated(self):
@@ -495,7 +493,6 @@ class TestNoConsoleErrors:
         page.on("pageerror", lambda err: errors.append(str(err)))
         page.goto(f"{live_server}#modulation")
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2000)
         assert len(errors) == 0, f"JS errors: {errors}"
 
 

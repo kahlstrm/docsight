@@ -32,7 +32,6 @@ class TestGlossaryVisualDesktop:
     def test_screenshot_popover_open(self, demo_page):
         hint = demo_page.locator('#view-dashboard .glossary-hint').first
         hint.click()
-        demo_page.wait_for_timeout(300)
         expect(demo_page.locator('body > .glossary-popover')).to_be_visible()
         demo_page.screenshot(
             path=os.path.join(SCREENSHOT_DIR, "popover_open.png"),
@@ -43,7 +42,6 @@ class TestGlossaryVisualDesktop:
         """Screenshot channel group header with glossary popover (on dashboard)."""
         hint = demo_page.locator('#view-dashboard .docsis-group-header .glossary-hint').first
         hint.click()
-        demo_page.wait_for_timeout(300)
         demo_page.screenshot(
             path=os.path.join(SCREENSHOT_DIR, "channel_popover.png"),
             full_page=False,
@@ -51,10 +49,8 @@ class TestGlossaryVisualDesktop:
 
     def test_screenshot_modulation_popovers(self, demo_page):
         demo_page.locator('.nav-item[data-view="modulation"]').click()
-        demo_page.wait_for_timeout(2000)
         hint = demo_page.locator('#view-modulation .glossary-hint').first
         hint.click()
-        demo_page.wait_for_timeout(300)
         demo_page.screenshot(
             path=os.path.join(SCREENSHOT_DIR, "modulation_popover.png"),
             full_page=False,
@@ -80,7 +76,6 @@ class TestGlossaryVisualMobile:
     def test_screenshot_mobile_popover(self, mobile_page):
         hint = mobile_page.locator('#view-dashboard .glossary-hint').first
         hint.click()
-        mobile_page.wait_for_timeout(300)
         mobile_page.screenshot(
             path=os.path.join(SCREENSHOT_DIR, "mobile_popover.png"),
             full_page=False,
@@ -107,13 +102,11 @@ class TestGlossaryVisualLightTheme:
         page.goto(live_server)
         page.wait_for_load_state("networkidle")
         page.evaluate("document.documentElement.setAttribute('data-theme', 'light')")
-        page.wait_for_timeout(300)
         return page
 
     def test_screenshot_light_popover(self, light_page):
         hint = light_page.locator('#view-dashboard .glossary-hint').first
         hint.click()
-        light_page.wait_for_timeout(300)
         light_page.screenshot(
             path=os.path.join(SCREENSHOT_DIR, "light_popover.png"),
             full_page=False,

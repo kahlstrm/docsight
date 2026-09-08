@@ -237,21 +237,18 @@ def tkg_disabled_server(tmp_path_factory):
 @pytest.fixture()
 def demo_page(page, live_server):
     page.goto(live_server)
-    page.wait_for_load_state("networkidle")
     return page
 
 
 @pytest.fixture()
 def settings_page(page, live_server):
     page.goto(f"{live_server}/settings")
-    page.wait_for_load_state("networkidle")
     return page
 
 
 @pytest.fixture()
 def configured_page(page, configured_server):
     page.goto(configured_server)
-    page.wait_for_load_state("networkidle")
     return page
 
 
@@ -263,21 +260,18 @@ def auth_page(page, auth_server):
 @pytest.fixture()
 def setup_page(page, setup_server):
     page.goto(setup_server)
-    page.wait_for_load_state("networkidle")
     return page
 
 
 @pytest.fixture()
 def fritzbox_page(page, fritzbox_server):
     page.goto(fritzbox_server)
-    page.wait_for_load_state("networkidle")
     return page
 
 
 @pytest.fixture()
 def tkg_core_page(page, tkg_core_server):
     page.goto(tkg_core_server)
-    page.wait_for_load_state("networkidle")
     return page
 
 

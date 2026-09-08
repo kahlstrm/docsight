@@ -189,11 +189,10 @@ def test_mobile_navigation_and_high_value_modals_pass_quality_gate(demo_page):
     assert hidden_focus_targets == []
     hamburger.focus()
     hamburger.click()
-    page.wait_for_timeout(300)
     expect(sidebar).to_have_attribute("aria-hidden", "false")
+    sidebar.evaluate("el => Promise.all(el.getAnimations().map(a => a.finished)).then(() => null)")
     _assert_visible_controls_stay_in_view(page, "open mobile navigation", "#sidebar")
     page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
     expect(sidebar).to_have_attribute("aria-hidden", "true")
     assert page.evaluate("document.activeElement && document.activeElement.id") == "hamburger"
 
@@ -205,7 +204,6 @@ def test_mobile_navigation_and_high_value_modals_pass_quality_gate(demo_page):
         page.evaluate(opener)
         modal = page.locator(selector)
         expect(modal).to_be_visible()
-        page.wait_for_timeout(100)
         if modal.locator(".modal-body").count() > 0:
             modal.locator(".modal-body").evaluate("el => { el.scrollTop = el.scrollHeight; }")
             body_height = modal.locator(".modal-body").evaluate("el => el.getBoundingClientRect().height")

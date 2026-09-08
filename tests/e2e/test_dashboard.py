@@ -403,7 +403,6 @@ class TestSignalRefresh:
         held[1].fulfill(content_type='text/html', body=newer)
         wait_js(page, "() => document.querySelector('#view-dashboard').textContent.includes('Newest trend marker')")
         held[0].fulfill(content_type='text/html', body=html.replace('24h signal trend', 'Stale trend marker'))
-        page.wait_for_timeout(100)
         assert 'Newest trend marker' in page.locator('#view-dashboard').text_content()
         assert 'Stale trend marker' not in page.locator('#view-dashboard').text_content()
 
