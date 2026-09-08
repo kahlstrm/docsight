@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Väljavõte: näidatud on ainult tsiteeritud lõige.",
   "glossary_law_source_label": "Ametlik allikas",
   "glossary_law_reviewed_label": "Allikas kontrollitud",
-  "glossary_law_disclaimer": "Üldteave, mitte õigusnõustamine."
+  "glossary_law_disclaimer": "Üldteave, mitte õigusnõustamine.",
+  "api_token_scope": "Juurdepääs",
+  "api_token_scope_metrics": "Ainult mõõdikud (Prometheus)",
+  "api_token_scope_api": "Üldine API-juurdepääs"
 }

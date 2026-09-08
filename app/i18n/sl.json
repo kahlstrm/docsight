@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Izvleček: prikazan je samo navedeni odstavek.",
   "glossary_law_source_label": "Uradni vir",
   "glossary_law_reviewed_label": "Vir preverjen",
-  "glossary_law_disclaimer": "Splošne informacije, ne pravni nasvet."
+  "glossary_law_disclaimer": "Splošne informacije, ne pravni nasvet.",
+  "api_token_scope": "Dostop",
+  "api_token_scope_metrics": "Samo metrike (Prometheus)",
+  "api_token_scope_api": "Splošni dostop do API-ja"
 }

@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Ištrauka: rodoma tik cituojama dalis.",
   "glossary_law_source_label": "Oficialus šaltinis",
   "glossary_law_reviewed_label": "Šaltinis patikrintas",
-  "glossary_law_disclaimer": "Bendroji informacija, ne teisinė konsultacija."
+  "glossary_law_disclaimer": "Bendroji informacija, ne teisinė konsultacija.",
+  "api_token_scope": "Prieiga",
+  "api_token_scope_metrics": "Tik metrikos (Prometheus)",
+  "api_token_scope_api": "Bendroji API prieiga"
 }

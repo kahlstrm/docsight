@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Ote: vain lainattu momentti näytetään.",
   "glossary_law_source_label": "Virallinen lähde",
   "glossary_law_reviewed_label": "Lähde tarkistettu",
-  "glossary_law_disclaimer": "Yleistä tietoa, ei oikeudellista neuvontaa."
+  "glossary_law_disclaimer": "Yleistä tietoa, ei oikeudellista neuvontaa.",
+  "api_token_scope": "Käyttöoikeus",
+  "api_token_scope_metrics": "Vain metriikat (Prometheus)",
+  "api_token_scope_api": "Yleinen API-käyttöoikeus"
 }

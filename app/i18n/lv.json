@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Izvilkums: parādīta tikai citētā daļa.",
   "glossary_law_source_label": "Oficiālais avots",
   "glossary_law_reviewed_label": "Avots pārbaudīts",
-  "glossary_law_disclaimer": "Vispārīga informācija, ne juridiska konsultācija."
+  "glossary_law_disclaimer": "Vispārīga informācija, ne juridiska konsultācija.",
+  "api_token_scope": "Piekļuve",
+  "api_token_scope_metrics": "Tikai metrikas (Prometheus)",
+  "api_token_scope_api": "Vispārīga piekļuve API"
 }
