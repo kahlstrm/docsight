@@ -241,7 +241,8 @@ def test_docker_paths_tags_manual_and_concurrency_contract():
         "tags": ["v*"],
         "paths": DOCKER_PATHS,
     }
-    assert triggers["workflow_dispatch"] is None
+    assert triggers["workflow_dispatch"]["inputs"]["no_cache"]["type"] == "boolean"
+    assert triggers["workflow_dispatch"]["inputs"]["no_cache"]["default"] is False
     assert workflow["concurrency"] == {
         "group": "docker-${{ github.ref }}",
         "cancel-in-progress": "${{ github.ref == 'refs/heads/main' }}",
@@ -396,3 +397,14 @@ def test_container_preserves_platforms_and_keeps_uv_out_of_runtime():
     assert "--prefix=/install -r requirements-uv.txt" not in builder
     assert "COPY --from=builder /install /usr/local" in runtime
     assert "uv pip install" not in runtime
+
+
+def test_image_cache_covers_builder_layers_and_allows_manual_refresh():
+    workflow = load_workflow("docker.yml")
+    build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("id") == "build")
+    options = build["with"]
+    assert options["cache-from"] == "type=gha,scope=docsight-image"
+    assert options["cache-to"] == "type=gha,scope=docsight-image,mode=max"
+    assert options["no-cache"] == "${{ github.event_name == 'workflow_dispatch' && inputs.no_cache }}"
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    assert dockerfile.index("ARG VERSION=dev") > dockerfile.index("RUN chmod +x /entrypoint.sh")

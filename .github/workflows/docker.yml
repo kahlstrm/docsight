@@ -16,6 +16,11 @@ on:
       - 'entrypoint.sh'
       - '.github/workflows/docker.yml'
   workflow_dispatch:
+    inputs:
+      no_cache:
+        description: Rebuild all layers without using the cache
+        type: boolean
+        default: false
 
 concurrency:
   group: docker-${{ github.ref }}
@@ -78,6 +83,9 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
+          cache-from: type=gha,scope=docsight-image
+          cache-to: type=gha,scope=docsight-image,mode=max
+          no-cache: ${{ github.event_name == 'workflow_dispatch' && inputs.no_cache }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: VERSION=${{ steps.version.outputs.tag }}
