@@ -31,4 +31,28 @@ codeword counters remain visible, and analysis reports `snr warning (unavailable
 Unlocked rows remain excluded from the existing active-channel contract; this
 release does not expose a separate channel-lock metric.
 
-Start with a 60-second polling interval. Alert separately on exporter availability, failed or stale collection, confirmed DOCSIS offline status and decreasing modem uptime.
+## Scrape credentials
+
+New API tokens default to `metrics` scope. They work only on `/metrics`, including
+when another endpoint has no authentication decorator. Create them through
+Settings → Security, or POST `/api/tokens` with a browser session and
+`{"name":"prometheus","scope":"metrics"}`. Enable `metrics_require_token` to
+require a token for scraping; that option remains opt-in for compatibility.
+
+General integrations must explicitly select `api` scope. Existing database
+tokens migrate to `api` scope to preserve their access; they do not become
+restricted scraper tokens automatically. Scope is shown in the settings table
+and token-list API. Revoke old scrape tokens and replace them with metrics-only
+tokens. Backup, restore and server-side backup browsing require session
+authentication when an admin password is configured, including for general API
+tokens. Initial setup without an admin password remains available.
+
+Keep management access restricted and configure an admin password. A restricted
+token cannot secure an application whose management routes intentionally allow
+unauthenticated access. Avoid exposing the general application to the scrape
+network when a proxy can allow only `GET /metrics`.
+
+Start with a 60-second polling interval. For alerts, distinguish an unreachable
+exporter, failing/stale collection, confirmed offline state and decreasing modem
+uptime. A missing metric is not evidence of an offline modem. Tune alert duration
+and history retention for the installation.

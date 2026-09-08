@@ -77,8 +77,8 @@ def test_two_apps_isolate_runtime_auth_storage_and_requests(tmp_path, order):
     replay_a.set_cookie("session", cookie_b.value)
     assert replay_a.get("/api/connection").status_code == 401
 
-    _, token_a = runtime_a.storage.create_api_token("app-a")
-    _, token_b = runtime_b.storage.create_api_token("app-b")
+    _, token_a = runtime_a.storage.create_api_token("app-a", scope="api")
+    _, token_b = runtime_b.storage.create_api_token("app-b", scope="api")
     bearer_a = {"Authorization": f"Bearer {token_a}"}
     bearer_b = {"Authorization": f"Bearer {token_b}"}
     assert app_a.test_client().get("/api/connection", headers=bearer_a).status_code == 200

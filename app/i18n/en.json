@@ -1140,5 +1140,8 @@
   "glossary_law_excerpt_note": "Excerpt: only the quoted subsection is shown.",
   "glossary_law_source_label": "Official source",
   "glossary_law_reviewed_label": "Source checked",
-  "glossary_law_disclaimer": "General information, not legal advice."
+  "glossary_law_disclaimer": "General information, not legal advice.",
+  "api_token_scope": "Access",
+  "api_token_scope_metrics": "Metrics only (Prometheus)",
+  "api_token_scope_api": "General API access"
 }

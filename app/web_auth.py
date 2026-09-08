@@ -189,6 +189,17 @@ def _invalidate_admin_sessions():
     session.clear()
 
 
+def restrict_metrics_tokens():
+    """Enforce scrape-only access even on routes without an auth decorator."""
+    storage = current_runtime().storage
+    header = request.headers.get("Authorization", "")
+    if storage and header.startswith("Bearer "):
+        token_info = storage.validate_api_token(header[7:])
+        request._api_token = token_info
+        if token_info and token_info.get("scope") == "metrics" and request.endpoint != "metrics_bp.metrics":
+            return jsonify({"error": "Metrics-only token cannot access this endpoint"}), 403
+
+
 def _auth_required(*, session_only=False):
     """Check if auth is enabled and user is not logged in.
 
@@ -204,8 +215,8 @@ def _auth_required(*, session_only=False):
     auth_header = request.headers.get("Authorization", "")
     if not session_only and auth_header.startswith("Bearer ") and _storage:
         token = auth_header[7:]
-        token_info = _storage.validate_api_token(token)
-        if token_info:
+        token_info = getattr(request, "_api_token", None) or _storage.validate_api_token(token)
+        if token_info and token_info.get("scope", "api") == "api":
             request._api_token = token_info
             return False
     return True
