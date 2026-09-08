@@ -249,7 +249,7 @@ def test_docker_paths_tags_manual_and_concurrency_contract():
     }
     metadata_tags = next(
         step["with"]["tags"]
-        for step in workflow["jobs"]["build-and-push"]["steps"]
+        for step in workflow["jobs"]["publish"]["steps"]
         if step.get("id") == "meta"
     )
     assert "type=ref,event=tag" in metadata_tags
@@ -272,6 +272,9 @@ def test_image_publication_requires_tests():
         assert command in verification["run"]
     build = next(step for step in publish["steps"] if step.get("id") == "build")
     assert build["with"]["pull"] is True
+    assert jobs["publish"]["needs"] == "build-and-push"
+    assert not jobs["publish"].get("if", "").startswith("always()")
+    assert not publish.get("continue-on-error", False)
 
 
 def test_test_workflow_detector_schedule_and_exact_path_contracts():
@@ -408,7 +411,23 @@ def test_uv_installs_keep_hash_checks_and_explicit_python(name):
 def test_container_preserves_platforms_and_keeps_uv_out_of_runtime():
     workflow = load_workflow("docker.yml")
     build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("name") == "Build and push")
-    assert build["with"]["platforms"] == "linux/amd64,linux/arm64,linux/arm/v7"
+    assert build["with"]["platforms"] == "${{ matrix.platform }}"
+    job = workflow["jobs"]["build-and-push"]
+    assert job["runs-on"] == "${{ matrix.runner }}"
+    assert job["strategy"]["matrix"]["include"] == [
+        {"arch": "amd64", "platform": "linux/amd64", "runner": "ubuntu-24.04", "bits": 64},
+        {"arch": "arm64", "platform": "linux/arm64", "runner": "ubuntu-24.04-arm", "bits": 64},
+        {"arch": "armv7", "platform": "linux/arm/v7", "runner": "ubuntu-24.04-arm", "bits": 32},
+    ]
+    assert all("setup-qemu" not in step.get("uses", "") for step in job["steps"])
+    assert "push-by-digest=true" in build["with"]["outputs"]
+    assert "tags" not in build["with"]
+    smoke = next(step for step in job["steps"] if step.get("name") == "Smoke-test native image and save digest")
+    assert "binfmt_misc/status" in smoke["run"]
+    assert "struct.calcsize" in smoke["run"]
+    merge = workflow["jobs"]["publish"]["steps"][-1]
+    assert "for arch in amd64 arm64 armv7" in merge["run"]
+    assert "imagetools create" in merge["run"]
     builder, runtime = (ROOT / "Dockerfile").read_text().split("# --- runtime stage:")
     assert "--only-binary=:all: --require-hashes -r requirements-uv.txt" in builder
     assert "--require-hashes --prefix=/install -r requirements.txt" in builder
@@ -421,8 +440,8 @@ def test_image_cache_covers_builder_layers_and_allows_manual_refresh():
     workflow = load_workflow("docker.yml")
     build = next(step for step in workflow["jobs"]["build-and-push"]["steps"] if step.get("name") == "Build and push")
     options = build["with"]
-    assert options["cache-from"] == "type=gha,scope=docsight-image"
-    assert options["cache-to"] == "type=gha,scope=docsight-image,mode=max"
+    assert options["cache-from"] == "type=gha,scope=docsight-native-${{ matrix.arch }}"
+    assert options["cache-to"] == "type=gha,scope=docsight-native-${{ matrix.arch }},mode=max"
     assert options["no-cache"] == "${{ github.event_name == 'workflow_dispatch' && inputs.no_cache }}"
     dockerfile = (ROOT / "Dockerfile").read_text()
     assert dockerfile.index("ARG VERSION=dev") > dockerfile.index("RUN chmod +x /entrypoint.sh")
