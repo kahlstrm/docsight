@@ -45,7 +45,7 @@ class TestSegmentNavigation:
         """Clicking segment nav should show the segment utilization view."""
         navigate_to_segment(fritzbox_page)
         view = fritzbox_page.locator("#view-segment-utilization")
-        assert view.is_visible()
+        expect(view).to_be_visible()
 
     def test_nav_item_becomes_active(self, fritzbox_page):
         """Nav item should get 'active' class when selected."""
@@ -300,7 +300,6 @@ class TestSegmentI18n:
     def test_title_in_english(self, page, fritzbox_server):
         """English title should appear in the tab."""
         page.goto(f"{fritzbox_server}/?lang=en")
-        page.wait_for_load_state("networkidle")
         navigate_to_segment(page)
         title = page.locator(".fritz-cable-title")
         assert "Segment" in title.text_content()
@@ -308,7 +307,6 @@ class TestSegmentI18n:
     def test_title_in_german(self, page, fritzbox_server):
         """German title should appear in the tab."""
         page.goto(f"{fritzbox_server}/?lang=de")
-        page.wait_for_load_state("networkidle")
         navigate_to_segment(page)
         title = page.locator(".fritz-cable-title")
         text = title.text_content()
@@ -317,7 +315,6 @@ class TestSegmentI18n:
     def test_nav_label_translated(self, page, fritzbox_server):
         """Nav item text should be translated per language."""
         page.goto(f"{fritzbox_server}/?lang=de")
-        page.wait_for_load_state("networkidle")
         nav = page.locator('.nav-item[data-view="segment-utilization"]')
         text = nav.text_content().strip()
         assert len(text) > 0, "Nav label should not be empty"
@@ -325,7 +322,6 @@ class TestSegmentI18n:
     def test_kpi_labels_translated_de(self, page, fritzbox_server):
         """KPI labels should be translated in German."""
         page.goto(f"{fritzbox_server}/?lang=de")
-        page.wait_for_load_state("networkidle")
         navigate_to_segment(page)
         labels = page.locator(".fritz-cable-kpi-label").all_text_contents()
         assert len(labels) == 3, f"Expected 3 KPI labels, got {len(labels)}"
@@ -370,7 +366,7 @@ class TestSegmentCorrelation:
         fritzbox_page.locator('.nav-item[data-view="correlation"]').click()
         expect(fritzbox_page.locator("#correlation-chart-container")).to_be_visible()
         view = fritzbox_page.locator("#view-correlation")
-        assert view.is_visible()
+        expect(view).to_be_visible()
 
     def test_correlation_legend_has_segment_entries(self, fritzbox_page):
         """Correlation legend should include Segment DS/US entries."""
@@ -553,14 +549,12 @@ class TestSegmentHashNavigation:
     def test_direct_hash_loads_segment_view(self, page, fritzbox_server):
         """Navigating to /#segment-utilization should show the segment tab."""
         page.goto(f"{fritzbox_server}/#segment-utilization")
-        page.wait_for_load_state("networkidle")
         view = page.locator("#view-segment-utilization")
-        assert view.is_visible()
+        expect(view).to_be_visible()
 
     def test_direct_hash_loads_data(self, page, fritzbox_server):
         """Direct hash navigation should load and display chart data."""
         page.goto(f"{fritzbox_server}/#segment-utilization")
-        page.wait_for_load_state("networkidle")
         wait_for_content(page)
         canvases = page.locator("#fritz-cable-ds-chart .uplot canvas").count()
         assert canvases >= 1, "Charts should render on direct hash navigation"

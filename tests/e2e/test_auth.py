@@ -28,7 +28,7 @@ class TestLoginFlow:
         auth_page.goto(f"{auth_server}/login")
         auth_page.fill('input[name="password"]', "e2e-test-password")
         auth_page.click('button[type="submit"]')
-        auth_page.wait_for_load_state("networkidle")
+        auth_page.wait_for_url(f"{auth_server}/")
         # Should land on dashboard (not /login)
         assert "/login" not in auth_page.url
 
@@ -36,7 +36,7 @@ class TestLoginFlow:
         auth_page.goto(f"{auth_server}/login")
         auth_page.fill('input[name="password"]', "e2e-test-password")
         auth_page.click('button[type="submit"]')
-        auth_page.wait_for_load_state("networkidle")
+        auth_page.wait_for_url(f"{auth_server}/")
         auth_page.goto(f"{auth_server}/settings")
         assert "settings" in auth_page.url.lower() or "Settings" in auth_page.title()
 
@@ -44,7 +44,7 @@ class TestLoginFlow:
         auth_page.goto(f"{auth_server}/login")
         auth_page.fill('input[name="password"]', "e2e-test-password")
         auth_page.click('button[type="submit"]')
-        auth_page.wait_for_load_state("networkidle")
+        auth_page.wait_for_url(f"{auth_server}/")
 
         logout_button = auth_page.locator('form[action="/logout"] button[type="submit"]')
         assert logout_button.is_visible()
@@ -58,14 +58,13 @@ class TestLoginFlow:
         auth_page.goto(f"{auth_server}/login")
         auth_page.fill('input[name="password"]', "e2e-test-password")
         auth_page.click('button[type="submit"]')
-        auth_page.wait_for_load_state("networkidle")
+        auth_page.wait_for_url(f"{auth_server}/")
         storage_state = auth_page.context.storage_state()
 
         restored_context = browser.new_context(storage_state=storage_state)
         try:
             restored_page = restored_context.new_page()
             restored_page.goto(auth_server)
-            restored_page.wait_for_load_state("networkidle")
             assert "/login" not in restored_page.url
         finally:
             restored_context.close()
