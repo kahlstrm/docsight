@@ -5,7 +5,7 @@
   "shards": [
     {
       "id": 1,
-      "collected_cases": 86,
+      "collected_cases": 98,
       "files": [
         "test_connection_monitor.py",
         "test_event_log_redesign.py",
@@ -13,12 +13,13 @@
         "test_module_views.py",
         "test_path_prefix_browser.py",
         "test_real_proxy_path_prefix.py",
-        "test_segment_utilization.py"
+        "test_segment_utilization.py",
+        "test_tkg_compensation.py"
       ]
     },
     {
       "id": 2,
-      "collected_cases": 159,
+      "collected_cases": 147,
       "files": [
         "test_auth.py",
         "test_charts.py",
@@ -26,7 +27,6 @@
         "test_evidence_report_scope.py",
         "test_glossary_visual.py",
         "test_setup.py",
-        "test_tkg_compensation.py",
         "test_theme.py"
       ]
     },
