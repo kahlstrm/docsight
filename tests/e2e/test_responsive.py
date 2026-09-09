@@ -1,6 +1,7 @@
 """E2E tests for responsive / mobile layout."""
 
 import pytest
+from playwright.sync_api import expect
 
 
 @pytest.fixture()
@@ -8,7 +9,6 @@ def mobile_page(page, live_server):
     """Page with a mobile viewport (375x667, iPhone SE)."""
     page.set_viewport_size({"width": 375, "height": 667})
     page.goto(live_server)
-    page.wait_for_load_state("networkidle")
     return page
 
 
@@ -59,17 +59,16 @@ class TestMobileLayout:
         hamburger.focus()
         hamburger.click()
 
-        active_id = mobile_page.evaluate("document.activeElement && document.activeElement.id")
-        active_view = mobile_page.evaluate(
-            "document.activeElement && document.activeElement.getAttribute('data-view')"
-        )
-        assert active_id == "sidebar" or active_view == "live"
+        mobile_page.wait_for_function("""() => {
+            const active = document.activeElement;
+            return active && (active.id === 'sidebar' || active.dataset.view === 'live');
+        }""")
         assert mobile_page.locator("#sidebar").get_attribute("aria-hidden") == "false"
 
         mobile_page.keyboard.press("Escape")
 
         assert mobile_page.locator("#sidebar").get_attribute("aria-hidden") == "true"
-        assert mobile_page.evaluate("document.activeElement && document.activeElement.id") == "hamburger"
+        expect(hamburger).to_be_focused()
 
     def test_mobile_sidebar_close_control_and_labels_are_touch_friendly(self, mobile_page):
         """Mobile drawer should have an obvious close control and contained labels."""
@@ -107,7 +106,7 @@ class TestMobileLayout:
 
         close_button.click()
         assert mobile_page.locator("#sidebar").get_attribute("aria-hidden") == "true"
-        assert mobile_page.evaluate("document.activeElement && document.activeElement.id") == "hamburger"
+        expect(hamburger).to_be_focused()
 
     def test_primary_nav_items_in_sidebar(self, mobile_page):
         mobile_page.locator("#hamburger").click()

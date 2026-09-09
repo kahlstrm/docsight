@@ -28,7 +28,6 @@ class TestModulationNavigation:
 
     def test_hash_routing(self, page, live_server):
         page.goto(f"{live_server}#modulation")
-        page.wait_for_load_state("networkidle")
         view = page.locator("#view-modulation")
         expect(view).to_be_visible()
 
@@ -66,7 +65,6 @@ class TestModulationNavigation:
     def test_home_family_kpis_share_hero_without_modulation_card(self, page, live_server):
         page.set_viewport_size({"width": 1280, "height": 900})
         page.goto(live_server)
-        page.wait_for_load_state("networkidle")
 
         visual = page.locator(".hero-visual-row")
         health = page.locator(".hero-channel-health")
@@ -102,7 +100,6 @@ class TestModulationNavigation:
         for width in (393, 760, 1100):
             page.set_viewport_size({"width": width, "height": 900})
             page.goto(live_server)
-            page.wait_for_load_state("networkidle")
 
             layout = page.evaluate(
                 """
@@ -477,7 +474,7 @@ class TestNoConsoleErrors:
         errors = []
         page.on("pageerror", lambda err: errors.append(str(err)))
         page.goto(f"{live_server}#modulation")
-        page.wait_for_load_state("networkidle")
+        page.wait_for_function("() => window._modCharts && window._modCharts.length >= 2")
         assert len(errors) == 0, f"JS errors: {errors}"
 
 
