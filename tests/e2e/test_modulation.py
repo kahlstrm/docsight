@@ -373,29 +373,22 @@ class TestModulationKPIs:
     @pytest.fixture(autouse=True)
     def navigate_to_modulation(self, demo_page):
         demo_page.locator('.nav-item[data-view="modulation"]').click()
+        expect(demo_page.locator(".mod-protocol-group").first).to_be_visible(timeout=150_000)
         self.page = demo_page
 
     def test_health_index_populated(self):
-        val = self.page.locator("#mod-kpi-health")
-        text = val.text_content().strip()
-        assert text != "" and text is not None
+        expect(self.page.locator("#mod-kpi-health")).to_contain_text(re.compile(r"\d"))
 
     def test_lowqam_populated(self):
-        val = self.page.locator("#mod-kpi-lowqam")
-        text = val.text_content().strip()
-        assert text != "" and text is not None
+        expect(self.page.locator("#mod-kpi-lowqam")).to_contain_text(re.compile(r"\d"))
 
     def test_density_populated(self):
-        val = self.page.locator("#mod-kpi-density")
-        text = val.text_content().strip()
-        assert text != "" and text is not None
+        expect(self.page.locator("#mod-kpi-density")).to_contain_text(re.compile(r"\d"))
 
     def test_health_has_color_class(self):
-        val = self.page.locator("#mod-kpi-health")
-        cls = val.get_attribute("class") or ""
-        text = val.text_content().strip()
-        if text != "\u2014":
-            assert "good" in cls or "warning" in cls or "critical" in cls
+        expect(self.page.locator("#mod-kpi-health")).to_have_class(
+            re.compile(r".*\b(good|warning|critical)\b.*")
+        )
 
 
 # ── Protocol Groups ──

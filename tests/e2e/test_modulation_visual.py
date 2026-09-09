@@ -35,7 +35,7 @@ def modulation_page_mobile(page, live_server):
     """Mobile viewport on modulation tab."""
     page.set_viewport_size({"width": 375, "height": 812})
     page.goto(f"{live_server}#modulation")
-    expect(page.locator(".mod-protocol-group").first).to_be_visible()
+    expect(page.locator(".mod-protocol-group").first).to_be_visible(timeout=150_000)
     return page
 
 

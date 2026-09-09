@@ -1213,7 +1213,7 @@ class TestSignalLifecycle:
         assert len(attempts) == 2
 
     def test_stale_legacy_cannot_replace_current_sparse_module_data(self, page, live_server):
-        from tests.e2e.support.signal_trends import start, painted, wait_count, rows, spark_pixels
+        from tests.e2e.support.signal_trends import start, painted, wait_count, rows, spark_pixels, wait_js
         held = []
         start(page, live_server, legacy=lambda route: held.append(route))
         painted(page)
@@ -1223,7 +1223,9 @@ class TestSignalLifecycle:
         sparse = [{'timestamp': row['timestamp'], 'speedtest_download': value,
                    'connection_monitor_latency_ms': value, 'ds_uncorrectable_errors': value}
                   for row, value in zip(rows(), [10, 30, 12])]
+        previous_bitmap = page.locator('#spark-speed').evaluate('c => c.toDataURL()')
         held[1].fulfill(json=sparse)
+        wait_js(page, "previous => document.querySelector('#spark-speed').toDataURL() !== previous", previous_bitmap)
         assert spark_pixels(page, '#spark-speed')
         bitmap = page.locator('#spark-speed').evaluate('c => c.toDataURL()')
         held[0].fulfill(json=rows(1))
