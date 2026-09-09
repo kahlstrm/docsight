@@ -90,10 +90,10 @@ def test_repository_manifest_covers_every_e2e_file_once_and_578_cases():
     assert manifest["expected_total"] == EXPECTED_TOTAL == 578
     assert manifest["baseline_cpu_seconds"] > 0
     assert [shard["collected_cases"] for shard in manifest["shards"]] == [
-        98,
+        81,
         147,
         161,
-        172,
+        189,
     ]
     assert len(validated) == 29
 
