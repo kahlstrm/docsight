@@ -60,8 +60,8 @@ class TestSSRFUrlValidation:
     def test_bad_url_does_not_persist(self, settings_page):
         """A rejected URL should not change any config state."""
         # Set a known good value via JS fetch
-        settings_page.evaluate("""
-            (async () => {
+        status = settings_page.evaluate("""
+            async () => {
                 await fetch('/api/config', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -73,10 +73,9 @@ class TestSSRFUrlValidation:
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({modem_url: 'file:///etc/passwd'})
                 });
-                window.__badUrlStatus = resp.status;
-            })();
+                return resp.status;
+            }
         """)
-        status = settings_page.evaluate("window.__badUrlStatus")
         assert status == 400
         # Reload settings page and check the modem_url field still has safe value
         settings_page.reload()
@@ -91,16 +90,16 @@ class TestSSRFUrlValidation:
 
     def test_settings_ui_shows_error_on_bad_url(self, settings_page):
         """Settings page should display an error when saving an invalid URL."""
-        settings_page.evaluate("""
-            fetch('/api/config', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({modem_url: 'file:///etc/passwd'})
-            }).then(r => r.json()).then(data => {
-                window.__ssrfTestResult = data;
-            });
+        result = settings_page.evaluate("""
+            async () => {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({modem_url: 'file:///etc/passwd'})
+                });
+                return response.json();
+            }
         """)
-        result = settings_page.evaluate("window.__ssrfTestResult")
         assert result["success"] is False
         assert "error" in result
 
