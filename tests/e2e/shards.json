@@ -1,24 +1,23 @@
 {
   "version": 1,
-  "expected_total": 586,
+  "expected_total": 578,
   "baseline_cpu_seconds": 1534.372,
   "shards": [
     {
       "id": 1,
-      "collected_cases": 86,
+      "collected_cases": 81,
       "files": [
         "test_connection_monitor.py",
-        "test_event_log_redesign.py",
-        "test_i18n.py",
         "test_module_views.py",
         "test_path_prefix_browser.py",
         "test_real_proxy_path_prefix.py",
-        "test_segment_utilization.py"
+        "test_segment_utilization.py",
+        "test_tkg_compensation.py"
       ]
     },
     {
       "id": 2,
-      "collected_cases": 162,
+      "collected_cases": 147,
       "files": [
         "test_auth.py",
         "test_charts.py",
@@ -26,7 +25,6 @@
         "test_evidence_report_scope.py",
         "test_glossary_visual.py",
         "test_setup.py",
-        "test_tkg_compensation.py",
         "test_theme.py"
       ]
     },
@@ -45,11 +43,13 @@
     },
     {
       "id": 4,
-      "collected_cases": 177,
+      "collected_cases": 189,
       "files": [
         "test_channels.py",
+        "test_event_log_redesign.py",
         "test_events.py",
         "test_glossary.py",
+        "test_i18n.py",
         "test_mobile_quality_gate.py",
         "test_modals.py",
         "test_modulation.py",

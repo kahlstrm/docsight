@@ -6,24 +6,12 @@ import pytest
 class TestLoginPage:
     """Login page rendering."""
 
-    def test_login_page_renders(self, auth_page, auth_server):
+    def test_login_page_redirect_and_form(self, auth_page, auth_server):
         auth_page.goto(auth_server)
-        # Should redirect to /login
         assert "/login" in auth_page.url
-
-    def test_login_page_title(self, auth_page, auth_server):
-        auth_page.goto(f"{auth_server}/login")
         assert "DOCSight" in auth_page.title()
-
-    def test_login_has_password_input(self, auth_page, auth_server):
-        auth_page.goto(f"{auth_server}/login")
-        pw = auth_page.locator('input[name="password"]')
-        assert pw.is_visible()
-
-    def test_login_has_submit_button(self, auth_page, auth_server):
-        auth_page.goto(f"{auth_server}/login")
-        btn = auth_page.locator('button[type="submit"]')
-        assert btn.is_visible()
+        assert auth_page.locator('input[name="password"]').is_visible()
+        assert auth_page.locator('button[type="submit"]').is_visible()
 
 
 class TestLoginFlow:
@@ -40,7 +28,7 @@ class TestLoginFlow:
         auth_page.goto(f"{auth_server}/login")
         auth_page.fill('input[name="password"]', "e2e-test-password")
         auth_page.click('button[type="submit"]')
-        auth_page.wait_for_load_state("networkidle")
+        auth_page.wait_for_url(f"{auth_server}/")
         # Should land on dashboard (not /login)
         assert "/login" not in auth_page.url
 
@@ -48,7 +36,7 @@ class TestLoginFlow:
         auth_page.goto(f"{auth_server}/login")
         auth_page.fill('input[name="password"]', "e2e-test-password")
         auth_page.click('button[type="submit"]')
-        auth_page.wait_for_load_state("networkidle")
+        auth_page.wait_for_url(f"{auth_server}/")
         auth_page.goto(f"{auth_server}/settings")
         assert "settings" in auth_page.url.lower() or "Settings" in auth_page.title()
 
@@ -56,7 +44,7 @@ class TestLoginFlow:
         auth_page.goto(f"{auth_server}/login")
         auth_page.fill('input[name="password"]', "e2e-test-password")
         auth_page.click('button[type="submit"]')
-        auth_page.wait_for_load_state("networkidle")
+        auth_page.wait_for_url(f"{auth_server}/")
 
         logout_button = auth_page.locator('form[action="/logout"] button[type="submit"]')
         assert logout_button.is_visible()
@@ -70,14 +58,13 @@ class TestLoginFlow:
         auth_page.goto(f"{auth_server}/login")
         auth_page.fill('input[name="password"]', "e2e-test-password")
         auth_page.click('button[type="submit"]')
-        auth_page.wait_for_load_state("networkidle")
+        auth_page.wait_for_url(f"{auth_server}/")
         storage_state = auth_page.context.storage_state()
 
         restored_context = browser.new_context(storage_state=storage_state)
         try:
             restored_page = restored_context.new_page()
             restored_page.goto(auth_server)
-            restored_page.wait_for_load_state("networkidle")
             assert "/login" not in restored_page.url
         finally:
             restored_context.close()

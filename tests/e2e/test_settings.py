@@ -5,12 +5,14 @@ import re
 import pytest
 from playwright.sync_api import expect
 
+from tests.e2e.support.signal_trends import wait_count
+
 
 def _login(auth_page, auth_server):
     auth_page.goto(f"{auth_server}/login")
     auth_page.fill('input[name="password"]', "e2e-test-password")
     auth_page.click('button[type="submit"]')
-    auth_page.wait_for_load_state("networkidle")
+    auth_page.wait_for_url(f"{auth_server}/")
 
 
 class TestSettingsLoad:
@@ -40,7 +42,7 @@ class TestSettingsLoad:
     @pytest.mark.parametrize("width", [1280, 390])
     def test_bnetz_extension_labels_distinguish_dashboard_and_file_watcher(self, settings_page, width):
         settings_page.set_viewport_size({"width": width, "height": 844})
-        settings_page.reload(wait_until="networkidle")
+        settings_page.reload()
         settings_page.evaluate("() => window.switchSection('extensions')")
 
         panel = settings_page.locator("#panel-extensions")
@@ -58,7 +60,7 @@ class TestSettingsMobileSidebar:
 
     def test_support_nav_stays_visible_when_mobile_sidebar_overflows(self, settings_page):
         settings_page.set_viewport_size({"width": 390, "height": 844})
-        settings_page.reload(wait_until="networkidle")
+        settings_page.reload()
 
         settings_page.locator(".mobile-menu-btn").click()
         sidebar = settings_page.locator("#settings-sidebar")
@@ -90,7 +92,7 @@ class TestSettingsMobileSidebar:
 
     def test_mobile_sidebar_escape_closes_drawer_and_restores_focus(self, settings_page):
         settings_page.set_viewport_size({"width": 390, "height": 844})
-        settings_page.reload(wait_until="networkidle")
+        settings_page.reload()
 
         menu_button = settings_page.locator("#mobile-menu-button")
         sidebar = settings_page.locator("#settings-sidebar")
@@ -114,7 +116,7 @@ class TestSettingsMobileSidebar:
 
     def test_mobile_sidebar_nav_selection_closes_drawer(self, settings_page):
         settings_page.set_viewport_size({"width": 390, "height": 844})
-        settings_page.reload(wait_until="networkidle")
+        settings_page.reload()
 
         settings_page.locator("#mobile-menu-button").click()
         sidebar = settings_page.locator("#settings-sidebar")
@@ -175,7 +177,7 @@ class TestSettingsMobileSidebar:
     ])
     def test_tablet_widths_use_comfortable_single_column_settings_forms(self, settings_page, width, expect_drawer, section, setup):
         settings_page.set_viewport_size({"width": width, "height": 844})
-        settings_page.reload(wait_until="networkidle")
+        settings_page.reload()
         settings_page.evaluate("section => window.switchSection(section)", section)
         if setup == "expand-webhook":
             settings_page.locator('#notification-webhook-card .notification-collapse-button').click()
@@ -237,7 +239,6 @@ class TestSettingsTabSwitching:
 
     def test_initial_hash_deep_link_restores_section_on_load(self, page, live_server):
         page.goto(f"{live_server}/settings#notifications")
-        page.wait_for_load_state("networkidle")
 
         expect(page.locator("#panel-notifications")).to_be_visible()
         expect(page.locator('button[data-section="notifications"]')).to_have_attribute(
@@ -355,7 +356,7 @@ class TestSettingsFormElements:
 
     def test_mqtt_status_wraps_without_mobile_overflow(self, settings_page):
         settings_page.set_viewport_size({"width": 390, "height": 844})
-        settings_page.reload(wait_until="networkidle")
+        settings_page.reload()
         settings_page.route(
             "**/api/test-mqtt",
             lambda route: route.fulfill(
@@ -445,7 +446,7 @@ class TestSettingsFormElements:
 
     def test_notifications_mobile_scroll_is_reduced_by_collapsed_channel_cards(self, settings_page):
         settings_page.set_viewport_size({"width": 390, "height": 844})
-        settings_page.reload(wait_until="networkidle")
+        settings_page.reload()
         settings_page.evaluate("() => window.switchSection('notifications')")
 
         metrics = settings_page.evaluate(
@@ -831,7 +832,6 @@ class TestSettingsDirtyState:
 
         _login(auth_page, auth_server)
         auth_page.goto(f"{auth_server}/settings")
-        auth_page.wait_for_load_state("networkidle")
         auth_page.route("**/api/config", capture_config)
 
         admin_password = auth_page.locator('#admin_password')
@@ -854,7 +854,6 @@ class TestSettingsDirtyState:
 
         _login(auth_page, auth_server)
         auth_page.goto(f"{auth_server}/settings")
-        auth_page.wait_for_load_state("networkidle")
         auth_page.route("**/api/config", capture_config)
 
         auth_page.locator('button[data-section="security"]').click()
@@ -1025,9 +1024,8 @@ class TestSettingsInstantToggleSave:
 
         with settings_page.expect_request("**/api/config"):
             pending_routes[0].fulfill(json={"success": True})
-        settings_page.wait_for_timeout(50)
 
-        assert len(pending_routes) == 2
+        wait_count(settings_page, pending_routes, 2)
         expect(footer).not_to_have_class(re.compile(r".*\bvisible\b.*"))
         pending_routes[1].fulfill(json={"success": True})
         expect(footer).not_to_have_class(re.compile(r".*\bvisible\b.*"))

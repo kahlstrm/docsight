@@ -97,7 +97,6 @@ def test_browser_urls_stay_within_root_or_docsight_mount(page, path_prefix_serve
         # desktop proxy button delegates to its click handler. Dispatch the
         # same real DOM click without making this URL smoke viewport-dependent.
         page.evaluate("document.getElementById('refresh-btn').click()")
-        page.wait_for_timeout(250)
 
     # Exercise representative built-in module scripts and their constructed URLs.
     for view in (
@@ -111,10 +110,7 @@ def test_browser_urls_stay_within_root_or_docsight_mount(page, path_prefix_serve
         button = page.locator(f'.nav-item[data-view="{view}"]')
         if button.count():
             button.first.click()
-            # These views start asynchronous API work. Let each real journey
-            # settle before switching views so the test does not manufacture
-            # aborted fetch errors.
-            page.wait_for_timeout(750)
+            page.wait_for_selector(f"#view-{view}.active", state="visible")
     snapshot_urls()
 
     # The events CSV is a representative download href; it must remain mounted.
@@ -122,8 +118,10 @@ def test_browser_urls_stay_within_root_or_docsight_mount(page, path_prefix_serve
     assert export_href is not None
     assert urlsplit(export_href).path.startswith(f"{mount_path}/api/")
 
+    # Finish module requests before unloading the dashboard; otherwise navigation
+    # aborts fetches and their error handlers pollute the console assertion below.
+    page.wait_for_load_state("networkidle")
     page.goto(f"{app_url}/settings", wait_until="domcontentloaded")
-    page.wait_for_timeout(500)
     assert page.evaluate("docsightUrl('/api/config')") == f"{mount_path}/api/config"
     snapshot_urls()
 

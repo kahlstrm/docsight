@@ -1,5 +1,7 @@
 """E2E tests for the Modulation Performance module (v2)."""
 
+import re
+
 import pytest
 from playwright.sync_api import expect
 
@@ -11,39 +13,21 @@ from tests.e2e.test_modulation_visual import _switch_distribution
 class TestModulationNavigation:
     """Sidebar nav → module tab activation."""
 
-    def test_sidebar_has_modulation_link(self, demo_page):
+    def test_sidebar_navigation_to_modulation_and_back(self, demo_page):
         nav = demo_page.locator('.nav-item[data-view="modulation"]')
-        assert nav.count() > 0
-
-    def test_sidebar_link_text(self, demo_page):
-        nav = demo_page.locator('.nav-item[data-view="modulation"]')
-        text = nav.text_content().strip()
-        assert "Modulation" in text
-
-    def test_click_opens_modulation_view(self, demo_page):
-        demo_page.locator('.nav-item[data-view="modulation"]').click()
-        view = demo_page.locator("#view-modulation")
-        expect(view).to_be_visible()
-
-    def test_modulation_nav_marked_active(self, demo_page):
-        demo_page.locator('.nav-item[data-view="modulation"]').click()
-        nav = demo_page.locator('.nav-item[data-view="modulation"]')
-        assert "active" in nav.get_attribute("class")
-
-    def test_live_view_hidden_when_modulation_active(self, demo_page):
-        demo_page.locator('.nav-item[data-view="modulation"]').click()
-        live = demo_page.locator("#view-dashboard")
-        expect(live).not_to_be_visible()
-
-    def test_switch_back_to_live(self, demo_page):
-        demo_page.locator('.nav-item[data-view="modulation"]').click()
+        expect(nav).to_have_count(1)
+        expect(nav).to_contain_text("Modulation")
+        nav.click()
+        expect(demo_page.locator("#view-modulation")).to_be_visible()
+        expect(nav).to_have_class(re.compile(r"\bactive\b"))
+        dashboard = demo_page.locator("#view-dashboard")
+        expect(dashboard).to_be_hidden()
         demo_page.locator('.nav-item[data-view="live"]').click()
-        live = demo_page.locator("#view-dashboard")
-        expect(live).to_be_visible()
+        expect(dashboard).to_be_visible()
+        expect(demo_page.locator("#view-modulation")).to_be_hidden()
 
     def test_hash_routing(self, page, live_server):
         page.goto(f"{live_server}#modulation")
-        page.wait_for_load_state("networkidle")
         view = page.locator("#view-modulation")
         expect(view).to_be_visible()
 
@@ -81,7 +65,6 @@ class TestModulationNavigation:
     def test_home_family_kpis_share_hero_without_modulation_card(self, page, live_server):
         page.set_viewport_size({"width": 1280, "height": 900})
         page.goto(live_server)
-        page.wait_for_load_state("networkidle")
 
         visual = page.locator(".hero-visual-row")
         health = page.locator(".hero-channel-health")
@@ -117,7 +100,6 @@ class TestModulationNavigation:
         for width in (393, 760, 1100):
             page.set_viewport_size({"width": width, "height": 900})
             page.goto(live_server)
-            page.wait_for_load_state("networkidle")
 
             layout = page.evaluate(
                 """
@@ -151,7 +133,6 @@ class TestModulationTabStructure:
     @pytest.fixture(autouse=True)
     def navigate_to_modulation(self, demo_page):
         demo_page.locator('.nav-item[data-view="modulation"]').click()
-        demo_page.wait_for_timeout(500)
         self.page = demo_page
 
     def test_has_title(self):
@@ -392,30 +373,22 @@ class TestModulationKPIs:
     @pytest.fixture(autouse=True)
     def navigate_to_modulation(self, demo_page):
         demo_page.locator('.nav-item[data-view="modulation"]').click()
-        demo_page.wait_for_timeout(1500)
+        expect(demo_page.locator(".mod-protocol-group").first).to_be_visible(timeout=150_000)
         self.page = demo_page
 
     def test_health_index_populated(self):
-        val = self.page.locator("#mod-kpi-health")
-        text = val.text_content().strip()
-        assert text != "" and text is not None
+        expect(self.page.locator("#mod-kpi-health")).to_contain_text(re.compile(r"\d"))
 
     def test_lowqam_populated(self):
-        val = self.page.locator("#mod-kpi-lowqam")
-        text = val.text_content().strip()
-        assert text != "" and text is not None
+        expect(self.page.locator("#mod-kpi-lowqam")).to_contain_text(re.compile(r"\d"))
 
     def test_density_populated(self):
-        val = self.page.locator("#mod-kpi-density")
-        text = val.text_content().strip()
-        assert text != "" and text is not None
+        expect(self.page.locator("#mod-kpi-density")).to_contain_text(re.compile(r"\d"))
 
     def test_health_has_color_class(self):
-        val = self.page.locator("#mod-kpi-health")
-        cls = val.get_attribute("class") or ""
-        text = val.text_content().strip()
-        if text != "\u2014":
-            assert "good" in cls or "warning" in cls or "critical" in cls
+        expect(self.page.locator("#mod-kpi-health")).to_have_class(
+            re.compile(r".*\b(good|warning|critical)\b.*")
+        )
 
 
 # ── Protocol Groups ──
@@ -494,8 +467,10 @@ class TestNoConsoleErrors:
         errors = []
         page.on("pageerror", lambda err: errors.append(str(err)))
         page.goto(f"{live_server}#modulation")
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2000)
+        page.wait_for_function(
+            "() => window._modCharts && window._modCharts.length >= 2",
+            timeout=150_000,
+        )
         assert len(errors) == 0, f"JS errors: {errors}"
 
 

@@ -26,37 +26,31 @@ class TestLanguageSwitching:
 
     def test_switch_to_german(self, page, live_server):
         page.goto(f"{live_server}/?lang=de")
-        page.wait_for_load_state("networkidle")
         lang = page.locator("html").get_attribute("lang")
         assert lang == "de"
 
     def test_switch_to_french(self, page, live_server):
         page.goto(f"{live_server}/?lang=fr")
-        page.wait_for_load_state("networkidle")
         lang = page.locator("html").get_attribute("lang")
         assert lang == "fr"
 
     def test_switch_to_spanish(self, page, live_server):
         page.goto(f"{live_server}/?lang=es")
-        page.wait_for_load_state("networkidle")
         lang = page.locator("html").get_attribute("lang")
         assert lang == "es"
 
     def test_settings_respects_lang_param(self, page, live_server):
         page.goto(f"{live_server}/settings?lang=de")
-        page.wait_for_load_state("networkidle")
         lang = page.locator("html").get_attribute("lang")
         assert lang == "de"
 
     def test_switch_to_new_european_language(self, page, live_server):
         page.goto(f"{live_server}/?lang=it")
-        page.wait_for_load_state("networkidle")
         lang = page.locator("html").get_attribute("lang")
         assert lang == "it"
 
     def test_settings_language_selector_lists_european_pack(self, page, live_server):
         page.goto(f"{live_server}/settings?lang=pl")
-        page.wait_for_load_state("networkidle")
         page.evaluate("switchSection('general')")
         values = page.locator("#language option").evaluate_all("opts => opts.map(o => o.value)")
         assert set(values) == EUROPEAN_LANGUAGE_PACK
@@ -65,7 +59,6 @@ class TestLanguageSwitching:
     def test_settings_language_selector_does_not_overflow_viewport(self, page, live_server, width, height):
         page.set_viewport_size({"width": width, "height": height})
         page.goto(f"{live_server}/settings?lang=nb")
-        page.wait_for_load_state("networkidle")
         page.evaluate("switchSection('general')")
         page.locator("#language").scroll_into_view_if_needed()
         metrics = page.evaluate(
@@ -99,7 +92,6 @@ class TestFirstRunLanguageInference:
         try:
             page = context.new_page()
             page.goto(isolated_setup_server["url"] + "/setup")
-            page.wait_for_load_state("networkidle")
 
             assert page.locator("html").get_attribute("lang") == expected
             assert page.locator("#lang-select").input_value() == expected
@@ -116,11 +108,9 @@ class TestFirstRunLanguageInference:
         try:
             page = context.new_page()
             page.goto(isolated_setup_server["url"] + "/setup")
-            page.wait_for_load_state("networkidle")
             assert page.locator("html").get_attribute("lang") == "de"
 
             page.goto(isolated_setup_server["url"] + "/setup?lang=fr")
-            page.wait_for_load_state("networkidle")
 
             assert page.locator("html").get_attribute("lang") == "fr"
             assert page.locator("#lang-select").input_value() == "fr"
@@ -128,7 +118,6 @@ class TestFirstRunLanguageInference:
 
             page.set_extra_http_headers({"Accept-Language": "en-US"})
             page.goto(isolated_setup_server["url"] + "/setup")
-            page.wait_for_load_state("networkidle")
 
             assert page.locator("html").get_attribute("lang") == "fr"
             assert page.locator("#lang-select").input_value() == "fr"
