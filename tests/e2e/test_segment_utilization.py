@@ -196,9 +196,14 @@ class TestSegmentRangeTabs:
 
     def test_switch_to_24h(self, fritzbox_page):
         """Clicking 24h tab should reload charts and activate the tab."""
+        from tests.e2e.test_charts import wait_for_uplot_replacement
+
         navigate_to_segment(fritzbox_page)
+        previous = fritzbox_page.locator("#fritz-cable-ds-chart .uplot canvas").first.element_handle()
         tab = fritzbox_page.locator('#fritz-cable-range-tabs .trend-tab[data-range="24h"]')
         tab.click()
+        wait_for_uplot_replacement(fritzbox_page, "fritz-cable-ds-chart", previous)
+        previous.dispose()
         assert "active" in tab.get_attribute("class")
         # Charts should still be rendered
         canvases = fritzbox_page.locator("#fritz-cable-ds-chart .uplot canvas").count()

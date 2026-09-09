@@ -402,7 +402,11 @@ class TestSignalRefresh:
         newer = html.replace('24h signal trend', 'Newest trend marker')
         held[1].fulfill(content_type='text/html', body=newer)
         wait_js(page, "() => document.querySelector('#view-dashboard').textContent.includes('Newest trend marker')")
-        held[0].fulfill(content_type='text/html', body=html.replace('24h signal trend', 'Stale trend marker'))
+        with page.expect_console_message(
+            predicate=lambda message: 'Stale dashboard HTML' in message.text,
+            timeout=10_000,
+        ):
+            held[0].fulfill(content_type='text/html', body=html.replace('24h signal trend', 'Stale trend marker'))
         assert 'Newest trend marker' in page.locator('#view-dashboard').text_content()
         assert 'Stale trend marker' not in page.locator('#view-dashboard').text_content()
 
