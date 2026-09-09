@@ -1,5 +1,7 @@
 """E2E tests for the Modulation Performance module (v2)."""
 
+import re
+
 import pytest
 from playwright.sync_api import expect
 
@@ -11,35 +13,18 @@ from tests.e2e.test_modulation_visual import _switch_distribution
 class TestModulationNavigation:
     """Sidebar nav → module tab activation."""
 
-    def test_sidebar_has_modulation_link(self, demo_page):
+    def test_sidebar_navigation_to_modulation_and_back(self, demo_page):
         nav = demo_page.locator('.nav-item[data-view="modulation"]')
-        assert nav.count() > 0
-
-    def test_sidebar_link_text(self, demo_page):
-        nav = demo_page.locator('.nav-item[data-view="modulation"]')
-        text = nav.text_content().strip()
-        assert "Modulation" in text
-
-    def test_click_opens_modulation_view(self, demo_page):
-        demo_page.locator('.nav-item[data-view="modulation"]').click()
-        view = demo_page.locator("#view-modulation")
-        expect(view).to_be_visible()
-
-    def test_modulation_nav_marked_active(self, demo_page):
-        demo_page.locator('.nav-item[data-view="modulation"]').click()
-        nav = demo_page.locator('.nav-item[data-view="modulation"]')
-        assert "active" in nav.get_attribute("class")
-
-    def test_live_view_hidden_when_modulation_active(self, demo_page):
-        demo_page.locator('.nav-item[data-view="modulation"]').click()
-        live = demo_page.locator("#view-dashboard")
-        expect(live).not_to_be_visible()
-
-    def test_switch_back_to_live(self, demo_page):
-        demo_page.locator('.nav-item[data-view="modulation"]').click()
+        expect(nav).to_have_count(1)
+        expect(nav).to_contain_text("Modulation")
+        nav.click()
+        expect(demo_page.locator("#view-modulation")).to_be_visible()
+        expect(nav).to_have_class(re.compile(r"\bactive\b"))
+        dashboard = demo_page.locator("#view-dashboard")
+        expect(dashboard).to_be_hidden()
         demo_page.locator('.nav-item[data-view="live"]').click()
-        live = demo_page.locator("#view-dashboard")
-        expect(live).to_be_visible()
+        expect(dashboard).to_be_visible()
+        expect(demo_page.locator("#view-modulation")).to_be_hidden()
 
     def test_hash_routing(self, page, live_server):
         page.goto(f"{live_server}#modulation")
