@@ -143,15 +143,14 @@ def _close_modal(page, selector):
     expect(page.locator(selector)).not_to_be_visible()
 
 
-def test_mobile_main_blades_have_no_overflow_or_offscreen_controls(demo_page):
+def test_mobile_main_blades_have_no_overflow_or_offscreen_controls(page, live_server):
     """Main mobile blades should fit a modern phone viewport without hidden horizontal controls."""
-    page = demo_page
     page.set_viewport_size(MOBILE_VIEWPORT)
     console_errors = []
     page_errors = []
     page.on("console", _record_console_error(console_errors))
     page.on("pageerror", lambda exc: page_errors.append(str(exc)))
-    page.reload()
+    page.goto(live_server)
     page.wait_for_load_state("networkidle")
 
     for label, view, selector in MAIN_BLADES:
@@ -164,15 +163,14 @@ def test_mobile_main_blades_have_no_overflow_or_offscreen_controls(demo_page):
         _assert_visible_controls_stay_in_view(page, label, selector)
 
 
-def test_mobile_navigation_and_high_value_modals_pass_quality_gate(demo_page):
+def test_mobile_navigation_and_high_value_modals_pass_quality_gate(page, live_server):
     """Mobile nav and key modals should expose controls without footer overlap or off-screen targets."""
-    page = demo_page
     page.set_viewport_size(MOBILE_VIEWPORT)
     console_errors = []
     page_errors = []
     page.on("console", _record_console_error(console_errors))
     page.on("pageerror", lambda exc: page_errors.append(str(exc)))
-    page.reload()
+    page.goto(live_server)
     page.wait_for_load_state("networkidle")
 
     sidebar = page.locator("#sidebar")
@@ -194,7 +192,7 @@ def test_mobile_navigation_and_high_value_modals_pass_quality_gate(demo_page):
     _assert_visible_controls_stay_in_view(page, "open mobile navigation", "#sidebar")
     page.keyboard.press("Escape")
     expect(sidebar).to_have_attribute("aria-hidden", "true")
-    assert page.evaluate("document.activeElement && document.activeElement.id") == "hamburger"
+    expect(hamburger).to_be_focused()
 
     page.evaluate("switchView('journal')")
     page.wait_for_selector("#view-journal.active", state="visible")

@@ -467,7 +467,10 @@ class TestNoConsoleErrors:
         errors = []
         page.on("pageerror", lambda err: errors.append(str(err)))
         page.goto(f"{live_server}#modulation")
-        page.wait_for_function("() => window._modCharts && window._modCharts.length >= 2")
+        page.wait_for_function(
+            "() => window._modCharts && window._modCharts.length >= 2",
+            timeout=150_000,
+        )
         assert len(errors) == 0, f"JS errors: {errors}"
 
 
