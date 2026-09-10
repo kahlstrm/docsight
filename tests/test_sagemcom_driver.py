@@ -775,3 +775,71 @@ def test_snr_validity_keeps_channel_and_counters(driver, snr, valid, bandwidth):
         assert 'unavailable' in channel['health_detail']
     output = format_metrics(analysis, {}, {}, 1000)
     assert f'docsight_downstream_snr_valid{{channel_id="21",frequency="562"}} {int(valid)}' in output
+
+
+class TestCableInterruptionRecovery:
+    @staticmethod
+    def locked_channels():
+        return [{"uid": 1, "ChannelID": 1, "LockStatus": True,
+                 "Frequency": 300000000.0, "SNR": 40.0, "PowerLevel": 5.0,
+                 "Modulation": "Qam256", "BandWidth": 8000000,
+                 "UnerroredCodewords": 0, "CorrectableCodewords": 0,
+                 "UncorrectableCodewords": 0, "SymbolRate": 6952}]
+
+    def test_unlock_then_relock_keeps_the_authenticated_session(self, driver):
+        responses = _mock_post([
+            _login_response(), _docsis_response([], []),
+            _docsis_response(self.locked_channels(), []),
+        ])
+        driver._session.post = MagicMock(side_effect=responses)
+        driver.login()
+        with pytest.raises(RuntimeError, match="no locked channels"):
+            driver.get_docsis_data()
+        assert driver._logged_in is True
+        result = driver.get_docsis_data()
+        assert len(result["channelDs"]["docsis30"]) == 1
+        requests_sent = [json.loads(call.kwargs["data"]["req"])["request"]
+                         for call in driver._session.post.call_args_list]
+        assert [request["id"] for request in requests_sent] == [0, 1, 2]
+        assert [request["session-id"] for request in requests_sent] == [0, 12345, 12345]
+
+    def test_request_id_error_reauthenticates_with_clean_login_state(self, driver):
+        responses = _mock_post([
+            {"reply": {"error": {"code": 16777234, "description": "XMO_REQUEST_ID_ERR"}}},
+            _login_response(session_id=56789),
+            _docsis_response(self.locked_channels(), []),
+        ])
+        driver._logged_in = True
+        driver._session_id = 12345
+        driver._request_id = 80
+        driver._server_nonce = "old-nonce"
+        driver._credential_hash = "old-hash"
+        driver._session.cookies.set("session", "old-cookie")
+        driver._session.post = MagicMock(side_effect=responses)
+        result = driver.get_docsis_data()
+        assert len(result["channelDs"]["docsis30"]) == 1
+        requests_sent = [json.loads(call.kwargs["data"]["req"])["request"]
+                         for call in driver._session.post.call_args_list]
+        assert [(request["session-id"], request["id"]) for request in requests_sent] == [
+            (12345, 81), (0, 0), (56789, 1),
+        ]
+        assert not driver._session.cookies
+        assert driver._logged_in is True
+
+    @pytest.mark.parametrize('recover', [False, True])
+    def test_request_id_errors_during_login_have_bounded_recovery(self, driver, recover):
+        error = {"reply": {"error": {"code": 16777234, "description": "XMO_REQUEST_ID_ERR"}}}
+        post = MagicMock(side_effect=_mock_post([error, _login_response() if recover else error]))
+        driver._session.post = post
+        fresh_session = MagicMock()
+        fresh_session.post = post
+        with patch('app.drivers.sagemcom.requests.Session', return_value=fresh_session), \
+             patch('app.drivers.sagemcom.time.sleep'):
+            if recover:
+                driver.login()
+                assert driver._logged_in is True
+            else:
+                with pytest.raises(RuntimeError, match='session error after retry'):
+                    driver.login()
+                assert driver._logged_in is False
+        assert post.call_count == 2
