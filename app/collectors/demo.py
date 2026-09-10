@@ -89,6 +89,7 @@ class DemoCollector(Collector):
         self._smart_capture = smart_capture
         self._discovery_published = False
         self._poll_count = 0
+        self._live_error_counters = {}
         self._device_info = {
             "manufacturer": "DOCSight",
             "model": "Demo Router",
@@ -155,20 +156,22 @@ class DemoCollector(Collector):
         base = _load_base_data()
         data = copy.deepcopy(base)
 
-        for ch in data["channelDs"]["docsis30"]:
-            ch["powerLevel"] = round(ch["powerLevel"] + random.uniform(-0.3, 0.3), 1)
-            ch["mse"] = round(ch["mse"] + random.uniform(-0.5, 0.5), 1)
-            # Errors slowly accumulate
-            ch["corrErrors"] += random.randint(0, 5) * self._poll_count
-            if random.random() < 0.02:
-                ch["nonCorrErrors"] += random.randint(1, 3)
-
-        for ch in data["channelDs"].get("docsis31", []):
-            ch["powerLevel"] = round(ch["powerLevel"] + random.uniform(-0.3, 0.3), 1)
-            ch["mer"] = round(ch["mer"] + random.uniform(-0.5, 0.5), 1)
-            ch["corrErrors"] += random.randint(0, 3) * self._poll_count
-            if random.random() < 0.01:
-                ch["nonCorrErrors"] += random.randint(1, 2)
+        for family, version, snr_key, corr_max, error_chance, uncorr_max in (
+            ("docsis30", "3.0", "mse", 5, 0.02, 3),
+            ("docsis31", "3.1", "mer", 3, 0.01, 2),
+        ):
+            for ch in data["channelDs"].get(family, []):
+                ch["powerLevel"] = round(ch["powerLevel"] + random.uniform(-0.3, 0.3), 1)
+                ch[snr_key] = round(ch[snr_key] + random.uniform(-0.5, 0.5), 1)
+                key = (version, ch["channelID"])
+                corr, uncorr = self._live_error_counters.get(
+                    key, (int(ch["corrErrors"]), int(ch["nonCorrErrors"]))
+                )
+                corr += random.randint(0, corr_max)
+                if random.random() < error_chance:
+                    uncorr += random.randint(1, uncorr_max)
+                self._live_error_counters[key] = (corr, uncorr)
+                ch["corrErrors"], ch["nonCorrErrors"] = corr, uncorr
 
         for ch in data["channelUs"]["docsis30"]:
             ch["powerLevel"] = round(ch["powerLevel"] + random.uniform(-0.3, 0.3), 1)
@@ -308,6 +311,7 @@ class DemoCollector(Collector):
             "VALUES (?, ?, ?, ?, ?)",
             rows,
         )
+        self._live_error_counters = dict(counter_state)
         log.info("Demo: seeded %d historical snapshots (%d days)", len(rows), days)
 
     def _generate_historical_analysis(self, index, diurnal, seasonal, bad_period, hour=12, day_of_year=1, counter_state=None):

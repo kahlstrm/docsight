@@ -67,3 +67,40 @@ def test_seeded_history_counters_are_cumulative_across_bad_windows(tmp_path, mon
     assert result['total']['uncorr_errors'] == (
         snapshots[-1]['summary']['ds_uncorrectable_errors'] - snapshots[0]['summary']['ds_uncorrectable_errors']
     )
+    collector._poll_count = 1
+    monkeypatch.setattr('app.collectors.demo.random.random', lambda: 1)
+    monkeypatch.setattr('app.collectors.demo.random.randint', lambda a, b: a)
+    live = collector._generate_data()
+    for ch in snapshots[-1]['ds_channels']:
+        family = 'docsis30' if ch['docsis_version'] == '3.0' else 'docsis31'
+        current = next(item for item in live['channelDs'][family] if item['channelID'] == ch['channel_id'])
+        assert current['corrErrors'] == ch['correctable_errors']
+        assert current['nonCorrErrors'] == ch['uncorrectable_errors']
+
+
+
+def test_live_counters_preserve_growth_across_quiet_polls(monkeypatch):
+    import copy
+    from app.collectors.demo import _load_base_data
+    from app.analyzer import analyze
+    from app.modules.comparison.counters import period_counter_growth
+
+    collector = DemoCollector(None, None, None, None, None, 300)
+    original = copy.deepcopy(_load_base_data())
+    snapshots = []
+    for poll in range(4):
+        active = poll in (0, 2)
+        monkeypatch.setattr('app.collectors.demo.random.random', lambda: 0 if active else 1)
+        monkeypatch.setattr('app.collectors.demo.random.randint', lambda a, b: b if active else a)
+        collector._poll_count = poll + 1
+        data = collector._generate_data()
+        analysis = analyze(data)
+        snapshots.append({**analysis, 'timestamp': f'2026-03-01T0{poll}:00:00Z'})
+
+    for field, key in [('correctable_errors', 'corr_errors'), ('uncorrectable_errors', 'uncorr_errors')]:
+        totals = [sum(ch[field] for ch in snapshot['ds_channels']) for snapshot in snapshots]
+        assert totals[0] == totals[1] < totals[2] == totals[3]
+        growth = period_counter_growth(snapshots)
+        assert growth['total'][key] == totals[-1] - totals[0]
+        assert growth['observed_seconds'][key] == 10800
+    assert _load_base_data() == original
