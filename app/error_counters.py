@@ -95,6 +95,37 @@ def _channel_key(channel: Mapping[str, object]) -> str:
     ))
 
 
+def observed_counter_increase(
+    previous: Sequence[Mapping[str, object]],
+    current: Sequence[Mapping[str, object]],
+    field: str,
+) -> Counter:
+    """Return growth only across the same channel cohort without any reset."""
+    def counters(channels):
+        values = {}
+        for channel in channels:
+            raw = channel.get(field)
+            try:
+                value = _counter(raw)
+            except OverflowError:
+                value = None
+            if isinstance(raw, bool) or isinstance(raw, float) and raw != value:
+                value = None
+            if value is None or value < 0:
+                continue
+            key = _channel_key(channel)
+            if key in values:
+                return {}
+            values[key] = value
+        return values
+
+    before, after = counters(previous), counters(current)
+    if not before or before.keys() != after.keys():
+        return None
+    deltas = [after[key] - value for key, value in before.items()]
+    return sum(deltas) if all(delta >= 0 for delta in deltas) else None
+
+
 def _coverage(channels: Sequence[Mapping[str, object]]) -> CounterCoverage:
     correctable = sum(_counter(channel.get("correctable_errors")) is not None for channel in channels)
     uncorrectable = sum(_counter(channel.get("uncorrectable_errors")) is not None for channel in channels)

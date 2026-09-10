@@ -59,6 +59,10 @@ UNSUPPORTED_ERRORS_SNAPSHOT = {
 }
 
 
+def _pair(snapshot):
+    return [snapshot, {**snapshot, "timestamp": snapshot["timestamp"].replace("06:00", "07:00")}]
+
+
 def _storage(snapshots):
     storage = MagicMock()
     storage.get_range_data.side_effect = lambda start, end: [
@@ -121,7 +125,7 @@ class TestCompareEndpoint:
     def test_delta_verdict_degraded(self, app_client):
         """Lower SNR + higher errors = degraded."""
         with patch("app.modules.comparison.routes._get_storage") as mock_storage:
-            storage = _storage([SNAPSHOT_A, SNAPSHOT_B])
+            storage = _storage(_pair(SNAPSHOT_A) + _pair(SNAPSHOT_B))
             mock_storage.return_value = storage
             resp = app_client.get(
                 "/api/comparison"
@@ -147,7 +151,7 @@ class TestCompareEndpoint:
             "us_channels": [],
         }
         with patch("app.modules.comparison.routes._get_storage") as mock_storage:
-            storage = _storage([SNAPSHOT_A, better_b])
+            storage = _storage(_pair(SNAPSHOT_A) + _pair(better_b))
             mock_storage.return_value = storage
             resp = app_client.get(
                 "/api/comparison"
@@ -160,7 +164,7 @@ class TestCompareEndpoint:
     def test_delta_verdict_unchanged(self, app_client):
         """Same values = unchanged."""
         with patch("app.modules.comparison.routes._get_storage") as mock_storage:
-            storage = _storage([SNAPSHOT_A, {**SNAPSHOT_A, "timestamp": SNAPSHOT_B["timestamp"]}])
+            storage = _storage(_pair(SNAPSHOT_A) + _pair({**SNAPSHOT_A, "timestamp": SNAPSHOT_B["timestamp"]}))
             mock_storage.return_value = storage
             resp = app_client.get(
                 "/api/comparison"
@@ -226,15 +230,15 @@ class TestAggregatePeriod:
         assert result["snapshots"] == 1
         assert result["avg"]["ds_power"] == 3.1
         assert result["avg"]["ds_snr"] == 34.2
-        assert result["total"]["corr_errors"] == 100
-        assert result["total"]["uncorr_errors"] == 0
+        assert result["total"]["corr_errors"] is None
+        assert result["total"]["uncorr_errors"] is None
 
     def test_multiple_snapshots_averages(self):
         result = _compare([SNAPSHOT_A, SNAPSHOT_B])["period_a"]
         assert result["snapshots"] == 2
         assert result["avg"]["ds_power"] == pytest.approx(3.65)
         assert result["avg"]["ds_snr"] == pytest.approx(32.85)
-        assert result["total"]["corr_errors"] == 300
+        assert result["total"]["corr_errors"] == 100
 
     def test_unsupported_error_counters_remain_none(self):
         result = _compare([UNSUPPORTED_ERRORS_SNAPSHOT])["period_a"]
@@ -266,12 +270,12 @@ class TestAggregatePeriod:
         assert result["timeseries"][0]["uncorr_errors"] is None
 
     def test_zero_error_counters_stay_supported_zeroes(self):
-        result = _compare([SNAPSHOT_A])["period_a"]
+        result = _compare(_pair(SNAPSHOT_A))["period_a"]
 
         assert result["errors_supported"] is True
         assert result["corr_errors_supported"] is True
         assert result["uncorr_errors_supported"] is True
-        assert result["total"]["corr_errors"] == 100
+        assert result["total"]["corr_errors"] == 0
         assert result["total"]["uncorr_errors"] == 0
 
     @pytest.mark.parametrize("counter", [{"ds_uncorrectable_errors": None}, {}])
@@ -288,7 +292,7 @@ class TestAggregatePeriod:
         assert result["errors_supported"] is True
         assert result["corr_errors_supported"] is True
         assert result["uncorr_errors_supported"] is False
-        assert result["total"]["corr_errors"] == 5
+        assert result["total"]["corr_errors"] is None
         assert result["total"]["uncorr_errors"] is None
         assert result["timeseries"][0]["uncorr_errors"] is None
 
@@ -297,7 +301,7 @@ class TestAggregatePeriod:
         assert result["period_a"]["snapshots"] == 1
         assert result["period_b"]["snapshots"] == 1
         assert result["period_a"]["timeseries"][0]["timestamp"] == SNAPSHOT_A["timestamp"]
-        assert result["period_b"]["total"]["uncorr_errors"] == 127
+        assert result["period_b"]["total"]["uncorr_errors"] is None
 
     def test_compare_periods_helper(self):
         from app.modules.comparison.routes import compare_periods
@@ -314,8 +318,8 @@ class TestAggregatePeriod:
 
         assert result["period_a"]["avg"]["ds_power"] == 3.1
         assert result["period_b"]["health_distribution"]["marginal"] == 1
-        assert result["delta"]["verdict"] == "degraded"
-        assert result["period_b"]["total"]["uncorr_errors"] == 127
+        assert result["delta"]["verdict"] == "insufficient_data"
+        assert result["period_b"]["total"]["uncorr_errors"] is None
 
 
 class TestComputeDelta:
@@ -326,18 +330,19 @@ class TestComputeDelta:
         assert delta["ds_power"] == pytest.approx(1.1)
         assert delta["ds_snr"] == pytest.approx(-2.7)
         assert delta["us_power"] == pytest.approx(0.3)
-        assert delta["uncorr_errors"] == 127
+        assert delta["uncorr_errors"] is None
 
     def test_delta_with_empty_period(self):
         delta = _compare([], [SNAPSHOT_B])["delta"]
         assert delta["ds_power"] is None
         assert delta["ds_snr"] is None
+        assert delta["verdict"] == "insufficient_data"
 
     def test_both_periods_empty(self):
         delta = _compare([], [])["delta"]
         assert delta["ds_power"] is None
         assert delta["uncorr_errors"] is None
-        assert delta["verdict"] == "unchanged"
+        assert delta["verdict"] == "insufficient_data"
 
     def test_delta_ignores_unsupported_error_counters(self):
         unsupported_a = [UNSUPPORTED_ERRORS_SNAPSHOT]
@@ -345,7 +350,7 @@ class TestComputeDelta:
             {**UNSUPPORTED_ERRORS_SNAPSHOT, "timestamp": "2026-03-08T06:00:00Z"}
         ]
 
-        delta = _compare(unsupported_a, unsupported_b)["delta"]
+        delta = _compare(_pair(unsupported_a[0]), _pair(unsupported_b[0]))["delta"]
 
         assert delta["uncorr_errors"] is None
         assert delta["verdict"] == "unchanged"
@@ -365,7 +370,7 @@ class TestComputeDelta:
             "ds_channels": [],
             "us_channels": [],
         }
-        delta = _compare([SNAPSHOT_A], [great])["delta"]
+        delta = _compare(_pair(SNAPSHOT_A), _pair(great))["delta"]
         assert delta["verdict"] == "improved"
 
 

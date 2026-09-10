@@ -422,7 +422,7 @@ def _format_comparison_evidence(comparison_data, s):
             to_b=_format_comparison_timestamp(period_b.get("to")),
         ),
         f"- {s.get('comparison_complaint_snapshots', 'Snapshots: Period A {snapshots_a}, Period B {snapshots_b}.').format(snapshots_a=period_a.get('snapshots', 0), snapshots_b=period_b.get('snapshots', 0))}",
-        f"- {s.get('comparison_complaint_verdict', 'Overall verdict: {verdict}.').format(verdict=s.get('comparison_verdict_' + str(delta.get('verdict', 'unchanged')), str(delta.get('verdict', 'unchanged')).title()))}",
+        f"- {s.get('comparison_complaint_verdict', 'Overall verdict: {verdict}.').format(verdict=s.get('comparison_verdict_' + str(delta.get('verdict', 'unchanged')), str(delta.get('verdict', 'unchanged')).replace('_', ' ').title()))}",
         f"- {s.get('comparison_complaint_health', 'Dominant health changed from {health_a} to {health_b}.').format(health_a=_comparison_top_health(period_a, s), health_b=_comparison_top_health(period_b, s))}",
         f"- {s.get('comparison_complaint_ds_power', 'Average DS power delta: {value}.').format(value=_format_comparison_value(delta.get('ds_power'), 'dBmV'))}",
         f"- {s.get('comparison_complaint_ds_snr', 'Average DS SNR delta: {value}.').format(value=_format_comparison_value(delta.get('ds_snr'), 'dB'))}",
@@ -430,6 +430,14 @@ def _format_comparison_evidence(comparison_data, s):
         f"- {s.get('comparison_complaint_uncorr', 'Uncorrectable error delta: {value}.').format(value=_format_comparison_value(delta.get('uncorr_errors'), '', True))}",
         "",
     ]
+    if "uncorr_errors_per_hour" in delta:
+        lines.insert(-1, "- " + s.get(
+            "comparison_complaint_uncorr_rate", "Uncorrectable error rate delta: {value} per observed hour."
+        ).format(value=_format_comparison_value(delta["uncorr_errors_per_hour"], "")))
+        lines.insert(-1, "- " + s.get(
+            "comparison_complaint_observed", "Error observation hours: Period A {a}, Period B {b}. Reset and missing-counter intervals are excluded."
+        ).format(a=round(period_a.get("observed_seconds", {}).get("uncorr_errors", 0) / 3600, 2),
+                 b=round(period_b.get("observed_seconds", {}).get("uncorr_errors", 0) / 3600, 2)))
     return "\n".join(lines)
 
 
