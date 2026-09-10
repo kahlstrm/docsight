@@ -95,34 +95,42 @@ def _channel_key(channel: Mapping[str, object]) -> str:
     ))
 
 
+def observed_counter_values(channels, field):
+    """Project valid counters onto stable channel identities."""
+    values = {}
+    for channel in channels:
+        raw = channel.get(field)
+        try:
+            value = _counter(raw)
+        except OverflowError:
+            value = None
+        if isinstance(raw, bool) or isinstance(raw, float) and raw != value:
+            value = None
+        if value is None or value < 0:
+            continue
+        key = _channel_key(channel)
+        if key in values:
+            return {}
+        values[key] = value
+    return values
+
+
 def observed_counter_increase(
     previous: Sequence[Mapping[str, object]],
     current: Sequence[Mapping[str, object]],
     field: str,
 ) -> Counter:
     """Return growth only across the same channel cohort without any reset."""
-    def counters(channels):
-        values = {}
-        for channel in channels:
-            raw = channel.get(field)
-            try:
-                value = _counter(raw)
-            except OverflowError:
-                value = None
-            if isinstance(raw, bool) or isinstance(raw, float) and raw != value:
-                value = None
-            if value is None or value < 0:
-                continue
-            key = _channel_key(channel)
-            if key in values:
-                return {}
-            values[key] = value
-        return values
 
-    before, after = counters(previous), counters(current)
+    before = observed_counter_values(previous, field)
+    after = observed_counter_values(current, field)
     if not before or before.keys() != after.keys():
         return None
-    deltas = [after[key] - value for key, value in before.items()]
+    from app.storage.error_counters import unwrap_uint32_counter_series
+
+    rows = [dict(before), dict(after)]
+    unwrap_uint32_counter_series(rows, before.keys())
+    deltas = [rows[1][key] - value for key, value in rows[0].items()]
     return sum(deltas) if all(delta >= 0 for delta in deltas) else None
 
 

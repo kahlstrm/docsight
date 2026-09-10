@@ -105,6 +105,7 @@ function _cmpRunComparison() {
                 window.__docsightComparisonResult = null;
                 return;
             }
+            data.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             _cmpLastResult = data;
             window.__docsightComparisonResult = data;
             _cmpRenderCharts(data);

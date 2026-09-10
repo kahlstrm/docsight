@@ -98,3 +98,41 @@ def test_missing_all_comparable_metrics_is_insufficient():
                                           [snapshot(2, None), snapshot(3, None)]]
     data = compare_periods(storage, '2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04')
     assert data['delta']['verdict'] == 'insufficient_data'
+
+
+def test_channel_rollover_preserves_growth_and_observation_time():
+    readings = [snapshot(0, 4294967290, [channel(1, 4294967290)]),
+                snapshot(1, 5, [channel(1, 5)]),
+                snapshot(2, 8, [channel(1, 8)])]
+    result = period_counter_growth(readings)
+    assert result['total']['uncorr_errors'] == 14
+    assert result['observed_seconds']['uncorr_errors'] == 7200
+    assert list(result['samples'].values()) == [None, 11, 3]
+    assert readings[1]['ds_channels'][0]['uncorrectable_errors'] == 5
+
+
+@pytest.mark.parametrize('with_channels', [False, True])
+def test_duplicate_counter_readings_ignore_signal_and_health_changes(with_channels):
+    readings = [snapshot(i, 100 + i * 10, [channel(1, 100 + i * 10)] if with_channels else None)
+                for i in range(3)]
+    duplicate = {**readings[1], 'summary': {**readings[1]['summary'], 'health': 'marginal', 'ds_snr_avg': 30}}
+    if with_channels:
+        duplicate['ds_channels'] = [{**readings[1]['ds_channels'][0], 'snr': 30}]
+    result = period_counter_growth([*readings, duplicate])
+    assert result == period_counter_growth(readings)
+
+
+@pytest.mark.parametrize('utc_stamp, local_stamp', [
+    ('2026-09-09T21:00:00Z', '2026-09-10 00:00'),
+    ('2026-01-09T22:00:00Z', '2026-01-10 00:00'),
+    ('2026-03-29T00:30:00Z', '2026-03-29 02:30'),
+    ('2026-03-29T01:30:00Z', '2026-03-29 04:30'),
+])
+def test_comparison_evidence_uses_selected_timezone(utc_stamp, local_stamp):
+    from app.modules.reports.report import _format_comparison_evidence
+    evidence = _format_comparison_evidence({
+        'timezone': 'Europe/Helsinki',
+        'period_a': {'from': utc_stamp, 'to': utc_stamp},
+        'period_b': {'from': utc_stamp, 'to': utc_stamp},
+    }, {})
+    assert f'Compared {local_stamp} to {local_stamp} against {local_stamp} to {local_stamp}.' in evidence

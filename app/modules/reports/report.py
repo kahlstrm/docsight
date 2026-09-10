@@ -4,7 +4,8 @@ import io
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fpdf import FPDF
 
@@ -393,7 +394,7 @@ def _format_comparison_value(value, unit="", is_int=False):
     return f"{text} {unit}".strip()
 
 
-def _format_comparison_timestamp(ts):
+def _format_comparison_timestamp(ts, tz_name="UTC"):
     if not ts:
         return "-"
     raw = str(ts).replace("Z", "+00:00")
@@ -401,7 +402,13 @@ def _format_comparison_timestamp(ts):
         dt = datetime.fromisoformat(raw)
     except ValueError:
         return str(ts)
-    return dt.strftime("%Y-%m-%d %H:%M")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    try:
+        zone = ZoneInfo(tz_name or "UTC")
+    except (ValueError, ZoneInfoNotFoundError):
+        zone = timezone.utc
+    return dt.astimezone(zone).strftime("%Y-%m-%d %H:%M")
 
 
 def _format_comparison_evidence(comparison_data, s):
@@ -411,15 +418,16 @@ def _format_comparison_evidence(comparison_data, s):
     period_a = comparison_data.get("period_a") or {}
     period_b = comparison_data.get("period_b") or {}
     delta = comparison_data.get("delta") or {}
+    tz_name = comparison_data.get("timezone") or "UTC"
 
     lines = [
         s.get("comparison_complaint_header", "Before/After comparison evidence:"),
         "",
         s.get("comparison_complaint_periods", "Compared {from_a} to {to_a} against {from_b} to {to_b}.").format(
-            from_a=_format_comparison_timestamp(period_a.get("from")),
-            to_a=_format_comparison_timestamp(period_a.get("to")),
-            from_b=_format_comparison_timestamp(period_b.get("from")),
-            to_b=_format_comparison_timestamp(period_b.get("to")),
+            from_a=_format_comparison_timestamp(period_a.get("from"), tz_name),
+            to_a=_format_comparison_timestamp(period_a.get("to"), tz_name),
+            from_b=_format_comparison_timestamp(period_b.get("from"), tz_name),
+            to_b=_format_comparison_timestamp(period_b.get("to"), tz_name),
         ),
         f"- {s.get('comparison_complaint_snapshots', 'Snapshots: Period A {snapshots_a}, Period B {snapshots_b}.').format(snapshots_a=period_a.get('snapshots', 0), snapshots_b=period_b.get('snapshots', 0))}",
         f"- {s.get('comparison_complaint_verdict', 'Overall verdict: {verdict}.').format(verdict=s.get('comparison_verdict_' + str(delta.get('verdict', 'unchanged')), str(delta.get('verdict', 'unchanged')).replace('_', ' ').title()))}",

@@ -390,8 +390,10 @@ class TestComplaintRoutes:
             "&comparison_to_a=2026-03-01T23:59:00Z"
             "&comparison_from_b=2026-03-08T00:00:00Z"
             "&comparison_to_b=2026-03-08T23:59:00Z"
+            "&comparison_timezone=Europe/Helsinki"
         ):
             with patch("app.modules.comparison.routes.compare_periods", return_value=comparison_data):
                 result = _get_comparison_data(object())
 
         assert result == comparison_data
+        assert result["timezone"] == "Europe/Helsinki"

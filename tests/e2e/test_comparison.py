@@ -154,6 +154,9 @@ class TestComparisonView:
 
         note = demo_page.locator("#report-comparison-note")
         expect(note).to_contain_text("attached")
+        assert demo_page.evaluate("buildReportRequestParams().get('comparison_timezone')") == demo_page.evaluate(
+            "Intl.DateTimeFormat().resolvedOptions().timeZone"
+        )
 
     def test_empty_baseline_shows_insufficient_data(self, demo_page):
         payload = _comparison_payload(True, 0)

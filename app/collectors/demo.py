@@ -272,6 +272,7 @@ class DemoCollector(Collector):
         start = now - timedelta(days=days)
 
         rows = []
+        counter_state = {}
         for i in range(total):
             ts = start + timedelta(minutes=i * interval_min)
             ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -290,7 +291,7 @@ class DemoCollector(Collector):
             bad_period = (day_of_year % 10 == 0 and 2 <= hour <= 8)
 
             analysis = self._generate_historical_analysis(
-                i, diurnal, seasonal, bad_period, hour, day_of_year
+                i, diurnal, seasonal, bad_period, hour, day_of_year, counter_state
             )
             rows.append((
                 ts_str,
@@ -309,9 +310,11 @@ class DemoCollector(Collector):
         )
         log.info("Demo: seeded %d historical snapshots (%d days)", len(rows), days)
 
-    def _generate_historical_analysis(self, index, diurnal, seasonal, bad_period, hour=12, day_of_year=1):
+    def _generate_historical_analysis(self, index, diurnal, seasonal, bad_period, hour=12, day_of_year=1, counter_state=None):
         """Generate a single analyzed snapshot for historical seeding."""
         base = _load_base_data()
+        if counter_state is None:
+            counter_state = {}
 
         # Evening congestion window (19–23h): US channels 3+4 may degrade
         evening_congestion = 19 <= hour <= 23
@@ -330,8 +333,11 @@ class DemoCollector(Collector):
             if bad_period:
                 power += random.uniform(1.5, 3.0)
                 snr -= random.uniform(2.0, 5.0)
-            corr = int(ch["corrErrors"] + index * random.randint(0, 3))
-            uncorr = int(random.randint(0, 2) if bad_period else 0)
+            key = ("3.0", ch["channelID"])
+            previous_corr, previous_uncorr = counter_state.get(key, (int(ch["corrErrors"]), 0))
+            corr = previous_corr + random.randint(0, 3)
+            uncorr = previous_uncorr + (random.randint(0, 2) if bad_period else 0)
+            counter_state[key] = (corr, uncorr)
             total_power += power
             total_snr += snr
             total_corr += corr
@@ -361,8 +367,11 @@ class DemoCollector(Collector):
             if bad_period:
                 power += random.uniform(1.0, 2.0)
                 snr -= random.uniform(1.5, 3.0)
-            corr = int(ch["corrErrors"] + index * random.randint(0, 2))
-            uncorr = int(random.randint(0, 1) if bad_period else 0)
+            key = ("3.1", ch["channelID"])
+            previous_corr, previous_uncorr = counter_state.get(key, (int(ch["corrErrors"]), 0))
+            corr = previous_corr + random.randint(0, 2)
+            uncorr = previous_uncorr + (random.randint(0, 1) if bad_period else 0)
+            counter_state[key] = (corr, uncorr)
             total_power += power
             total_snr += snr
             total_corr += corr

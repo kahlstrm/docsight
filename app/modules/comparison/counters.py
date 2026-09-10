@@ -5,7 +5,7 @@ from itertools import groupby
 from math import isfinite
 
 from app.aggregation.window import canonical_utc_timestamp
-from app.error_counters import observed_counter_increase
+from app.error_counters import observed_counter_increase, observed_counter_values
 
 
 def _summary_counter(snapshot, field):
@@ -32,6 +32,17 @@ def _increase(previous, current, field):
     return b - a if a is not None and b is not None and b >= a else None
 
 
+def _counter_projection(snapshot):
+    summary = snapshot.get("summary") or {}
+    if summary.get("errors_supported") is False:
+        return None
+    channels = snapshot.get("ds_channels")
+    fields = ("correctable_errors", "uncorrectable_errors")
+    if channels:
+        return tuple(observed_counter_values(channels, field) for field in fields)
+    return tuple(_summary_counter(snapshot, field) for field in fields)
+
+
 def period_counter_growth(snapshots):
     def timestamp(snapshot):
         return canonical_utc_timestamp(snapshot.get("timestamp"))
@@ -45,7 +56,8 @@ def period_counter_growth(snapshots):
         readings = list(group)
         current = readings[0]
         # Conflicting readings at the same instant cannot establish a baseline.
-        if any(reading != current for reading in readings[1:]):
+        if any(_counter_projection(reading) != _counter_projection(current)
+               for reading in readings[1:]):
             previous = None
             samples[stamp] = None
             continue

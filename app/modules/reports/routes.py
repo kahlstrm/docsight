@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, make_response, request
 
 from app.aggregation import select_preferred_bnetz
-from app.tz import utc_cutoff, utc_now
+from app.tz import get_tz_name, utc_cutoff, utc_now
 from app.web_auth import require_auth
 
 from .report import generate_complaint_text, generate_report
@@ -115,7 +115,11 @@ def _get_comparison_data(storage):
         return None
     try:
         from app.modules.comparison.routes import compare_periods
-        return compare_periods(storage, from_a, to_a, from_b, to_b)
+        comparison = compare_periods(storage, from_a, to_a, from_b, to_b)
+        comparison["timezone"] = request.args.get("comparison_timezone") or get_tz_name(
+            current_runtime().config_manager
+        )
+        return comparison
     except (ImportError, Exception):
         return None
 
