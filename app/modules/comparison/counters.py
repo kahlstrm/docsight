@@ -32,15 +32,14 @@ def _increase(previous, current, field):
     return b - a if a is not None and b is not None and b >= a else None
 
 
-def _counter_projection(snapshot):
+def _counter_projection(snapshot, field):
     summary = snapshot.get("summary") or {}
     if summary.get("errors_supported") is False:
         return None
     channels = snapshot.get("ds_channels")
-    fields = ("correctable_errors", "uncorrectable_errors")
     if channels:
-        return tuple(observed_counter_values(channels, field) for field in fields)
-    return tuple(_summary_counter(snapshot, field) for field in fields)
+        return observed_counter_values(channels, field)
+    return _summary_counter(snapshot, field)
 
 
 def period_counter_growth(snapshots):
@@ -50,35 +49,34 @@ def period_counter_growth(snapshots):
     totals = {"corr_errors": None, "uncorr_errors": None}
     seconds = dict.fromkeys(totals, 0)
     samples = {}
-    previous = None
-    previous_time = None
+    previous = dict.fromkeys(totals)
     for stamp, group in groupby(sorted(snapshots, key=timestamp), key=timestamp):
         readings = list(group)
         current = readings[0]
-        # Conflicting readings at the same instant cannot establish a baseline.
-        if any(_counter_projection(reading) != _counter_projection(current)
-               for reading in readings[1:]):
-            previous = None
-            samples[stamp] = None
-            continue
+        samples[stamp] = None
         try:
             time = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
         except ValueError:
-            previous = None
-            samples[stamp] = None
+            previous = dict.fromkeys(totals)
             continue
-        samples[stamp] = None
-        if previous is not None:
-            elapsed = (time - previous_time).total_seconds()
-            for key, field in (("corr_errors", "correctable_errors"),
-                               ("uncorr_errors", "uncorrectable_errors")):
-                increase = _increase(previous, current, field)
+        for key, field in (("corr_errors", "correctable_errors"),
+                           ("uncorr_errors", "uncorrectable_errors")):
+            # A duplicate conflict invalidates only this counter's baseline.
+            projection = _counter_projection(current, field)
+            if any(_counter_projection(reading, field) != projection
+                   for reading in readings[1:]):
+                previous[key] = None
+                continue
+            if previous[key] is not None:
+                prior, prior_time = previous[key]
+                elapsed = (time - prior_time).total_seconds()
+                increase = _increase(prior, current, field)
                 if increase is not None and elapsed > 0:
                     totals[key] = (totals[key] or 0) + increase
                     seconds[key] += elapsed
                     if key == "uncorr_errors":
                         samples[stamp] = increase
-        previous, previous_time = current, time
+            previous[key] = (current, time)
     rates = {key: total * 3600 / seconds[key] if seconds[key] else None
              for key, total in totals.items()}
     return {"total": totals, "observed_seconds": seconds, "errors_per_hour": rates,

@@ -136,3 +136,37 @@ def test_comparison_evidence_uses_selected_timezone(utc_stamp, local_stamp):
         'period_b': {'from': utc_stamp, 'to': utc_stamp},
     }, {})
     assert f'Compared {local_stamp} to {local_stamp} against {local_stamp} to {local_stamp}.' in evidence
+
+
+@pytest.mark.parametrize('with_channels', [False, True])
+@pytest.mark.parametrize('conflicting_field, affected, unaffected', [
+    ('correctable_errors', 'corr_errors', 'uncorr_errors'),
+    ('uncorrectable_errors', 'uncorr_errors', 'corr_errors'),
+])
+def test_duplicate_conflicts_only_interrupt_the_affected_counter(
+    with_channels, conflicting_field, affected, unaffected,
+):
+    readings = [snapshot(i, 100 + i * 10) for i in range(4)]
+    if with_channels:
+        for i, reading in enumerate(readings):
+            reading['ds_channels'] = [{
+                **channel(1, 100 + i * 10), 'correctable_errors': 100 + i * 10,
+            }]
+    duplicate = {**readings[1], 'summary': {
+        **readings[1]['summary'], 'ds_' + conflicting_field: 111,
+    }}
+    if with_channels:
+        duplicate['ds_channels'] = [{
+            **readings[1]['ds_channels'][0], conflicting_field: 111,
+        }]
+
+    result = period_counter_growth([*readings, duplicate])
+    assert result['total'][unaffected] == 30
+    assert result['observed_seconds'][unaffected] == 10800
+    assert result['errors_per_hour'][unaffected] == 10
+    assert result['total'][affected] == 10
+    assert result['observed_seconds'][affected] == 3600
+    assert result['errors_per_hour'][affected] == 10
+    expected_samples = [None, 10, 10, 10] if unaffected == 'uncorr_errors' else [None, None, None, 10]
+    assert list(result['samples'].values()) == expected_samples
+    assert period_counter_growth([duplicate, *reversed(readings)]) == result
