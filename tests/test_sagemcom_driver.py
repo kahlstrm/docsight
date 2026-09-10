@@ -728,6 +728,21 @@ def test_metadata_reboot_and_missing_values_are_not_cached(driver):
     assert info['model'] == 'FAST3896_WIFIHUBC4'
 
 
+def test_metadata_reauthenticates_expired_session(driver):
+    driver._logged_in = True
+    driver._session.post = _mock_post([
+        {'reply': {'error': {'code': 16777219, 'description': 'XMO_INVALID_SESSION_ERR'}}},
+        _login_response(),
+        _metadata_response(170015, 'OPERATIONAL'),
+    ])
+
+    info = driver.get_device_info()
+
+    assert info['uptime_seconds'] == 170015
+    assert info['docsis_status'] == 'online'
+    assert driver._logged_in is True
+
+
 def test_failed_optional_action_preserves_other_metadata(driver):
     response = _metadata_response(170015, 'OPERATIONAL')
     response['reply']['actions'][2]['error']['description'] = 'XMO_UNKNOWN_PATH_ERR'

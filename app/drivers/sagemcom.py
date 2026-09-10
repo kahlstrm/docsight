@@ -225,7 +225,14 @@ class SagemcomDriver(ModemDriver):
         try:
             actions = [{"id": index, "method": "getValue", "xpath": path}
                        for index, path in enumerate(paths.values())]
-            values = self._response_values(self._api_call(actions))
+            try:
+                response = self._api_call(actions)
+            except (requests.HTTPError, RuntimeError) as exc:
+                log.warning("Device info fetch failed (%s), re-authenticating", exc)
+                self._logged_in = False
+                self.login()
+                response = self._api_call(actions)
+            values = self._response_values(response)
             for field in ("model", "sw_version"):
                 value = values.get(paths[field])
                 if isinstance(value, str):
