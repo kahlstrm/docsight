@@ -83,16 +83,16 @@ def _write_result(
     )
 
 
-def test_repository_manifest_covers_every_e2e_file_once_and_578_cases():
+def test_repository_manifest_covers_every_e2e_file_once_and_580_cases():
     manifest = load_manifest(MANIFEST)
     validated = validate_manifest(manifest, E2E_DIR)
 
-    assert manifest["expected_total"] == EXPECTED_TOTAL == 578
+    assert manifest["expected_total"] == EXPECTED_TOTAL == 580
     assert manifest["baseline_cpu_seconds"] > 0
     assert [shard["collected_cases"] for shard in manifest["shards"]] == [
         81,
         147,
-        161,
+        163,
         189,
     ]
     assert len(validated) == 29
