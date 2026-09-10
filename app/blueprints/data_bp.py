@@ -305,10 +305,13 @@ def api_export():
                 "|-----------|----------|--------|------|--------|-------------|",
             ]
             for st in speedtests:
+                measurements = " | ".join(
+                    f"{st[key]}{unit}" if st.get(key) is not None else "—"
+                    for key, unit in (("ping_ms", " ms"), ("jitter_ms", " ms"), ("packet_loss_pct", "%"))
+                )
                 lines.append(
                     f"| {st['timestamp']} | {st.get('download_human', '')} | {st.get('upload_human', '')} "
-                    f"| {st.get('ping_ms', '-')} ms | {st.get('jitter_ms', '-')} ms "
-                    f"| {st.get('packet_loss_pct', '-')}% |"
+                    f"| {measurements} |"
                 )
 
         if mode == "full":

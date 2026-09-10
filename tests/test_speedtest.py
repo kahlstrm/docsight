@@ -295,6 +295,20 @@ def speedtest_client(tmp_path):
 
 
 class TestSpeedtestAPI:
+    @pytest.mark.parametrize("result,expected", [
+        ({}, "—"), ({"ping_ms": None}, "—"),
+        ({"ping_ms": 0}, "0 ms"), ({"ping_ms": 12.5}, "12.5 ms"),
+    ])
+    def test_connection_test_ping_display(self, speedtest_client, result, expected):
+        with patch("app.modules.speedtest.client.SpeedtestClient") as client:
+            client.return_value.get_latest_with_error.return_value = ([result], None)
+            response = speedtest_client.post("/api/test-speedtest", json={
+                "speedtest_tracker_url": "http://speedtest.local:8999",
+                "speedtest_tracker_token": PASSWORD_MASK,
+            })
+        assert response.status_code == 200
+        assert response.get_json()["latest"]["ping"] == expected
+
     @patch("app.modules.speedtest.client.requests.Session.get")
     def test_api_speedtest(self, mock_get, speedtest_client):
         mock_resp = MagicMock()

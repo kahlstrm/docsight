@@ -777,7 +777,7 @@ function runSpeedtest() {
                                         showToast(
                                             (T.speedtest_complete || 'Speedtest complete') + ': ' +
                                             r.download_mbps + ' / ' + r.upload_mbps + ' Mbps, ' +
-                                            r.ping_ms + ' ms',
+                                            (r.ping_ms == null ? '\u2014' : r.ping_ms + ' ms'),
                                             'success'
                                         );
                                         loadSpeedtestHistory();

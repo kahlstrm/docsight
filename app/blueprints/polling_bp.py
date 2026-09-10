@@ -192,7 +192,7 @@ def api_test_speedtest():
                 "latest": {
                     "download": r.get("download_human") or f"{r.get('download_mbps', 0)} Mbps",
                     "upload": r.get("upload_human") or f"{r.get('upload_mbps', 0)} Mbps",
-                    "ping": f"{r.get('ping_ms', 0)} ms",
+                    "ping": f"{r['ping_ms']} ms" if r.get("ping_ms") is not None else "—",
                 },
             })
         return jsonify({"success": True, "results": 0})

@@ -81,6 +81,30 @@ class TestExportEndpoint:
             storage.get_recent_events.assert_called_once_with(hours=hours)
             speedtests.return_value.get_recent_speedtests.assert_called_once_with(limit=limit)
 
+    @pytest.mark.parametrize("measurements,expected", [
+        ({}, "— | — | —"),
+        ({"ping_ms": None, "jitter_ms": None, "packet_loss_pct": None}, "— | — | —"),
+        ({"ping_ms": 0, "jitter_ms": 0, "packet_loss_pct": 0}, "0 ms | 0 ms | 0%"),
+        ({"ping_ms": 12.5, "jitter_ms": 2.5, "packet_loss_pct": 1}, "12.5 ms | 2.5 ms | 1%"),
+    ])
+    def test_export_speedtest_measurements(self, client, sample_analysis, measurements, expected):
+        current_runtime().update_state(analysis=sample_analysis)
+        storage = Mock(db_path="unused.db")
+        storage.get_recent_events.return_value = []
+        current_runtime().storage = storage
+        with patch("app.modules.speedtest.storage.SpeedtestStorage") as speedtests, patch(
+            "app.modules.journal.storage.JournalStorage"
+        ) as journal:
+            speedtests.return_value.get_recent_speedtests.return_value = [{
+                "timestamp": "2026-09-07T10:00:00Z",
+                "download_human": "250 Mbps", "upload_human": "25 Mbps",
+                **measurements,
+            }]
+            journal.return_value.get_active_entries.return_value = []
+            response = client.get("/api/export")
+        assert response.status_code == 200
+        assert f"| 250 Mbps | 25 Mbps | {expected} |" in response.get_json()["text"]
+
     def test_export_labels_detected_speed_and_error_counts(self, client, sample_analysis):
         current_runtime().update_state(
             analysis=sample_analysis,
