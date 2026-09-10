@@ -7,7 +7,8 @@ var _cmpLastResult = null;
 function _cmpPresetDates(preset) {
     var now = new Date();
     var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    var yesterday = new Date(today.getTime() - 86400000);
+    var yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
 
     switch (preset) {
         case 'yesterday_today':
@@ -19,9 +20,12 @@ function _cmpPresetDates(preset) {
             };
         case 'last_this_week': {
             var dow = today.getDay() || 7; // Mon=1 ... Sun=7
-            var thisMonday = new Date(today.getTime() - (dow - 1) * 86400000);
-            var lastMonday = new Date(thisMonday.getTime() - 7 * 86400000);
-            var lastSunday = new Date(thisMonday.getTime() - 86400000);
+            var thisMonday = new Date(today);
+            thisMonday.setDate(today.getDate() - (dow - 1));
+            var lastMonday = new Date(thisMonday);
+            lastMonday.setDate(thisMonday.getDate() - 7);
+            var lastSunday = new Date(thisMonday);
+            lastSunday.setDate(thisMonday.getDate() - 1);
             return {
                 fromA: _cmpFmtDT(lastMonday, 0, 0),
                 toA: _cmpFmtDT(lastSunday, 23, 59),
@@ -47,13 +51,12 @@ function _cmpFmtDT(date, hours, minutes) {
     if (minutes !== undefined) d.setMinutes(minutes);
     d.setSeconds(0);
     d.setMilliseconds(0);
-    return d.toISOString().replace('Z', '').slice(0, 16);
+    return _cmpShortDate(d).replace(' ', 'T');
 }
 
 function _cmpToISO(dtLocal) {
     if (!dtLocal) return '';
-    /* datetime-local gives "YYYY-MM-DDTHH:MM", append seconds + Z */
-    return dtLocal + ':00Z';
+    return new Date(dtLocal).toISOString().replace('.000Z', 'Z');
 }
 
 /* ── UI Handlers ── */
@@ -102,6 +105,7 @@ function _cmpRunComparison() {
                 window.__docsightComparisonResult = null;
                 return;
             }
+            data.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             _cmpLastResult = data;
             window.__docsightComparisonResult = data;
             _cmpRenderCharts(data);
@@ -124,7 +128,7 @@ function _cmpNormalize(timeseries, periodStart) {
     return timeseries.map(function(pt) {
         var ms = new Date(pt.timestamp).getTime();
         var hours = (ms - startMs) / 3600000;
-        return { hours: Math.round(hours * 10) / 10, pt: pt };
+        return { hours: hours, pt: pt };
     });
 }
 
@@ -242,6 +246,14 @@ function _cmpRenderDeltaTable(data) {
     if (_cmpPeriodSupportsDocsisErrors(pa) || _cmpPeriodSupportsDocsisErrors(pb)) {
         _cmpAppendDeltaRow(tbody, T['docsight.comparison.uncorr_errors'] || 'Uncorr. Errors',
             pa.total.uncorr_errors, pb.total.uncorr_errors, '', delta.uncorr_errors, false, true);
+        if (pa.errors_per_hour && pb.errors_per_hour) {
+            _cmpAppendDeltaRow(tbody, T['docsight.comparison.uncorr_rate'] || 'Uncorr. Errors / hour',
+                pa.errors_per_hour.uncorr_errors, pb.errors_per_hour.uncorr_errors,
+                '', delta.uncorr_errors_per_hour, false, false);
+            _cmpAppendDeltaRow(tbody, T['docsight.comparison.observed_hours'] || 'Error observation hours',
+                pa.observed_seconds.uncorr_errors / 3600, pb.observed_seconds.uncorr_errors / 3600,
+                'h', null, false, false);
+        }
     }
 
     /* Health verdict row */
@@ -277,6 +289,11 @@ function _cmpRenderHealthDistribution(data) {
 function _cmpRenderHealthCard(rangeEl, container, period) {
     rangeEl.textContent = _cmpFormatRange(period.from, period.to);
     while (container.firstChild) container.removeChild(container.firstChild);
+
+    if (!period.snapshots) {
+        container.textContent = T['docsight.comparison.no_data_period'] || 'No data in selected period';
+        return;
+    }
 
     [
         ['good', _cmpHealthLabel('good')],
@@ -387,6 +404,7 @@ function _cmpTopHealth(dist) {
         total += dist[k];
         if (dist[k] > bestCount) { bestCount = dist[k]; best = k; }
     }
+    if (!total) return '-';
     var pct = Math.round(bestCount / total * 100);
     return best.charAt(0).toUpperCase() + best.slice(1) + ' (' + pct + '%)';
 }

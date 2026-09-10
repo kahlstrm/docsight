@@ -154,3 +154,30 @@ class TestComparisonView:
 
         note = demo_page.locator("#report-comparison-note")
         expect(note).to_contain_text("attached")
+        assert demo_page.evaluate("buildReportRequestParams().get('comparison_timezone')") == demo_page.evaluate(
+            "Intl.DateTimeFormat().resolvedOptions().timeZone"
+        )
+
+    def test_empty_baseline_shows_insufficient_data(self, demo_page):
+        payload = _comparison_payload(True, 0)
+        payload['period_a'].update(snapshots=0, timeseries=[], health_distribution={})
+        payload['delta']['verdict'] = 'insufficient_data'
+        demo_page.route('**/api/comparison**', lambda route: route.fulfill(json=payload))
+        navigate_to_comparison(demo_page)
+        demo_page.locator('#comparison-run-btn').click()
+        expect(demo_page.locator('#comparison-delta')).to_contain_text('Insufficient data')
+        expect(demo_page.locator('#comparison-health-bars-a')).to_contain_text('No data in selected period')
+        expect(demo_page.locator('#comparison-delta')).not_to_contain_text('Unchanged')
+
+    def test_observed_error_rates_and_hours_are_visible(self, demo_page):
+        payload = _comparison_payload(True, 0)
+        for key in ('period_a', 'period_b'):
+            payload[key]['errors_per_hour'] = {'uncorr_errors': 12}
+            payload[key]['observed_seconds'] = {'uncorr_errors': 7200}
+        payload['delta']['uncorr_errors_per_hour'] = 0
+        demo_page.route('**/api/comparison**', lambda route: route.fulfill(json=payload))
+        navigate_to_comparison(demo_page)
+        demo_page.locator('#comparison-run-btn').click()
+        expect(demo_page.locator('#comparison-delta')).to_contain_text('Uncorr. errors / hour')
+        expect(demo_page.locator('#comparison-delta')).to_contain_text('2.0 h')
+        expect(demo_page.locator('#comparison-delta')).to_contain_text('Reset and missing-counter intervals are excluded')

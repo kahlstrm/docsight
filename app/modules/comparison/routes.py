@@ -10,6 +10,7 @@ from app.aggregation import (
 )
 from app.analyzer import threshold_snapshot
 from app.web_auth import require_auth
+from .counters import period_counter_growth
 
 bp = Blueprint("comparison_module", __name__)
 
@@ -18,24 +19,27 @@ def _get_storage():
     return current_runtime().storage
 
 
-def _comparison_view(aggregate):
+def _comparison_view(aggregate, snapshots):
     """Map the shared aggregate to the established comparison response shape."""
     totals = aggregate["totals"]
+    growth = period_counter_growth(snapshots)
     return {
         "snapshots": aggregate["snapshot_count"],
         "avg": {
             key: (round(value, 2) if value is not None else None)
             for key, value in aggregate["averages"].items()
         },
-        "total": {
-            "corr_errors": totals["ds_correctable_errors"],
-            "uncorr_errors": totals["ds_uncorrectable_errors"],
-        },
+        "total": growth["total"],
+        "observed_seconds": growth["observed_seconds"],
+        "errors_per_hour": growth["errors_per_hour"],
         "errors_supported": totals["errors_supported"],
         "corr_errors_supported": totals["correctable_supported"],
         "uncorr_errors_supported": totals["uncorrectable_supported"],
         "health_distribution": aggregate["health_distribution"],
-        "timeseries": aggregate["samples"],
+        "timeseries": [
+            {**sample, "uncorr_errors": growth["samples"].get(sample["timestamp"])}
+            for sample in aggregate["samples"]
+        ],
     }
 
 
@@ -59,21 +63,28 @@ def _compute_delta(period_a, period_b):
     else:
         uncorr_d = None
 
-    # Verdict: improved if SNR went up and errors went down (or stayed)
-    # degraded if SNR went down or errors went up significantly
+    a_rate = period_a["errors_per_hour"]["uncorr_errors"]
+    b_rate = period_b["errors_per_hour"]["uncorr_errors"]
+    rate_delta = b_rate - a_rate if a_rate is not None and b_rate is not None else None
+
+    # Normalize error growth by observed time so unequal windows are comparable.
     score = 0
     if ds_snr_d is not None:
         if ds_snr_d > 1:
             score += 1
         elif ds_snr_d < -1:
             score -= 1
-    if uncorr_d is not None:
-        if uncorr_d > 10:
+    if rate_delta is not None:
+        if rate_delta > 10:
             score -= 1
-        elif uncorr_d < 0:
+        elif rate_delta < 0:
             score += 1
 
-    if score > 0:
+    enough_samples = all(len({sample["timestamp"] for sample in period["timeseries"]}) >= 2
+                         for period in (period_a, period_b))
+    if not enough_samples or (ds_snr_d is None and rate_delta is None):
+        verdict = "insufficient_data"
+    elif score > 0:
         verdict = "improved"
     elif score < 0:
         verdict = "degraded"
@@ -85,6 +96,7 @@ def _compute_delta(period_a, period_b):
         "ds_snr": ds_snr_d,
         "us_power": us_power_d,
         "uncorr_errors": uncorr_d,
+        "uncorr_errors_per_hour": rate_delta,
         "verdict": verdict,
     }
 
@@ -105,8 +117,8 @@ def compare_periods(storage, from_a, to_a, from_b, to_b):
         window=Window(from_b, to_b),
         thresholds=thresholds,
     )
-    period_a = _comparison_view(aggregate_a)
-    period_b = _comparison_view(aggregate_b)
+    period_a = _comparison_view(aggregate_a, snapshots_a)
+    period_b = _comparison_view(aggregate_b, snapshots_b)
     period_a["from"] = from_a
     period_a["to"] = to_a
     period_b["from"] = from_b

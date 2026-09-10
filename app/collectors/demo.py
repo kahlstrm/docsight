@@ -89,6 +89,7 @@ class DemoCollector(Collector):
         self._smart_capture = smart_capture
         self._discovery_published = False
         self._poll_count = 0
+        self._live_error_counters = {}
         self._device_info = {
             "manufacturer": "DOCSight",
             "model": "Demo Router",
@@ -155,20 +156,22 @@ class DemoCollector(Collector):
         base = _load_base_data()
         data = copy.deepcopy(base)
 
-        for ch in data["channelDs"]["docsis30"]:
-            ch["powerLevel"] = round(ch["powerLevel"] + random.uniform(-0.3, 0.3), 1)
-            ch["mse"] = round(ch["mse"] + random.uniform(-0.5, 0.5), 1)
-            # Errors slowly accumulate
-            ch["corrErrors"] += random.randint(0, 5) * self._poll_count
-            if random.random() < 0.02:
-                ch["nonCorrErrors"] += random.randint(1, 3)
-
-        for ch in data["channelDs"].get("docsis31", []):
-            ch["powerLevel"] = round(ch["powerLevel"] + random.uniform(-0.3, 0.3), 1)
-            ch["mer"] = round(ch["mer"] + random.uniform(-0.5, 0.5), 1)
-            ch["corrErrors"] += random.randint(0, 3) * self._poll_count
-            if random.random() < 0.01:
-                ch["nonCorrErrors"] += random.randint(1, 2)
+        for family, version, snr_key, corr_max, error_chance, uncorr_max in (
+            ("docsis30", "3.0", "mse", 5, 0.02, 3),
+            ("docsis31", "3.1", "mer", 3, 0.01, 2),
+        ):
+            for ch in data["channelDs"].get(family, []):
+                ch["powerLevel"] = round(ch["powerLevel"] + random.uniform(-0.3, 0.3), 1)
+                ch[snr_key] = round(ch[snr_key] + random.uniform(-0.5, 0.5), 1)
+                key = (version, ch["channelID"])
+                corr, uncorr = self._live_error_counters.get(
+                    key, (int(ch["corrErrors"]), int(ch["nonCorrErrors"]))
+                )
+                corr += random.randint(0, corr_max)
+                if random.random() < error_chance:
+                    uncorr += random.randint(1, uncorr_max)
+                self._live_error_counters[key] = (corr, uncorr)
+                ch["corrErrors"], ch["nonCorrErrors"] = corr, uncorr
 
         for ch in data["channelUs"]["docsis30"]:
             ch["powerLevel"] = round(ch["powerLevel"] + random.uniform(-0.3, 0.3), 1)
@@ -272,6 +275,7 @@ class DemoCollector(Collector):
         start = now - timedelta(days=days)
 
         rows = []
+        counter_state = {}
         for i in range(total):
             ts = start + timedelta(minutes=i * interval_min)
             ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -290,7 +294,7 @@ class DemoCollector(Collector):
             bad_period = (day_of_year % 10 == 0 and 2 <= hour <= 8)
 
             analysis = self._generate_historical_analysis(
-                i, diurnal, seasonal, bad_period, hour, day_of_year
+                i, diurnal, seasonal, bad_period, hour, day_of_year, counter_state
             )
             rows.append((
                 ts_str,
@@ -307,11 +311,14 @@ class DemoCollector(Collector):
             "VALUES (?, ?, ?, ?, ?)",
             rows,
         )
+        self._live_error_counters = dict(counter_state)
         log.info("Demo: seeded %d historical snapshots (%d days)", len(rows), days)
 
-    def _generate_historical_analysis(self, index, diurnal, seasonal, bad_period, hour=12, day_of_year=1):
+    def _generate_historical_analysis(self, index, diurnal, seasonal, bad_period, hour=12, day_of_year=1, counter_state=None):
         """Generate a single analyzed snapshot for historical seeding."""
         base = _load_base_data()
+        if counter_state is None:
+            counter_state = {}
 
         # Evening congestion window (19–23h): US channels 3+4 may degrade
         evening_congestion = 19 <= hour <= 23
@@ -330,8 +337,11 @@ class DemoCollector(Collector):
             if bad_period:
                 power += random.uniform(1.5, 3.0)
                 snr -= random.uniform(2.0, 5.0)
-            corr = int(ch["corrErrors"] + index * random.randint(0, 3))
-            uncorr = int(random.randint(0, 2) if bad_period else 0)
+            key = ("3.0", ch["channelID"])
+            previous_corr, previous_uncorr = counter_state.get(key, (int(ch["corrErrors"]), 0))
+            corr = previous_corr + random.randint(0, 3)
+            uncorr = previous_uncorr + (random.randint(0, 2) if bad_period else 0)
+            counter_state[key] = (corr, uncorr)
             total_power += power
             total_snr += snr
             total_corr += corr
@@ -361,8 +371,11 @@ class DemoCollector(Collector):
             if bad_period:
                 power += random.uniform(1.0, 2.0)
                 snr -= random.uniform(1.5, 3.0)
-            corr = int(ch["corrErrors"] + index * random.randint(0, 2))
-            uncorr = int(random.randint(0, 1) if bad_period else 0)
+            key = ("3.1", ch["channelID"])
+            previous_corr, previous_uncorr = counter_state.get(key, (int(ch["corrErrors"]), 0))
+            corr = previous_corr + random.randint(0, 2)
+            uncorr = previous_uncorr + (random.randint(0, 1) if bad_period else 0)
+            counter_state[key] = (corr, uncorr)
             total_power += power
             total_snr += snr
             total_corr += corr

@@ -19,12 +19,16 @@
   "ds_power": "DS Power",
   "ds_snr": "DS SNR",
   "us_power": "US Power",
-  "uncorr_errors": "Uncorr. Errors",
+  "uncorr_errors": "Observed uncorr. errors",
   "health": "Health",
   "health_distribution": "Health Distribution",
   "use_in_complaint": "Use in Complaint Letter",
   "snapshots": "Snapshots",
   "no_data_period": "No data in selected period",
   "select_periods": "Select two time periods to compare signal quality.",
-  "hours_since_start": "Hours since start"
+  "hours_since_start": "Hours since start",
+  "insufficient_data": "Insufficient data",
+  "uncorr_rate": "Uncorr. errors / hour",
+  "observed_hours": "Error observation hours",
+  "evidence_note": "Errors are increases between comparable readings. Reset and missing-counter intervals are excluded. The verdict compares error rates per observed hour and average SNR; it does not measure packet loss or prove a repair is stable."
 }

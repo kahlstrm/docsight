@@ -308,6 +308,7 @@ function buildReportRequestParams() {
         params.set('comparison_to_a', cmp.period_a.to);
         params.set('comparison_from_b', cmp.period_b.from);
         params.set('comparison_to_b', cmp.period_b.to);
+        if (cmp.timezone) params.set('comparison_timezone', cmp.timezone);
     }
     return params;
 }
