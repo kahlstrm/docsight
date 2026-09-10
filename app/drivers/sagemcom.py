@@ -37,6 +37,10 @@ log = logging.getLogger("docsis.driver.sagemcom")
 class XMOSessionError(RuntimeError):
     """Raised when the modem returns a session-related XMO error."""
 
+
+class DOCSISUnavailableError(RuntimeError):
+    """The API is reachable but the modem has no locked cable channels."""
+
 _API_PATH = "/cgi/json-req"
 _NSS = [{"name": "gtw", "uri": "http://sagemcom.com/gateway-data"}]
 
@@ -114,6 +118,9 @@ class SagemcomDriver(ModemDriver):
         self._logged_in = False
 
     def _do_login(self) -> None:
+        self._session.cookies.clear()
+        self._session_id = 0
+        self._server_nonce = ""
         self._request_id = 0
         # Initial credential hash uses empty server nonce (nonce not yet known)
         self._credential_hash = hashlib.sha512(
@@ -160,6 +167,9 @@ class SagemcomDriver(ModemDriver):
     def get_docsis_data(self) -> DocsisData:
         try:
             return self._fetch_docsis_data()
+        except DOCSISUnavailableError:
+            # Loss of RF lock does not invalidate an authenticated API session.
+            raise
         except (requests.HTTPError, RuntimeError) as e:
             log.warning("DOCSIS data fetch failed (%s), re-authenticating", e)
             self._logged_in = False
@@ -185,7 +195,7 @@ class SagemcomDriver(ModemDriver):
         ds30, ds31 = self._parse_downstream(ds_raw)
         us30, us31 = self._parse_upstream(us_raw)
         if not (ds30 or ds31 or us30 or us31):
-            raise RuntimeError("Sagemcom returned no locked channels")
+            raise DOCSISUnavailableError("Sagemcom returned no locked channels")
 
         return {
             "channelDs": {"docsis30": ds30, "docsis31": ds31},
@@ -309,7 +319,8 @@ class SagemcomDriver(ModemDriver):
             desc = error.get("description", "")
             code = error.get("code")
             msg = f"Sagemcom XMO error: {desc} (code={code})"
-            if code == 16777219 or "SESSION" in desc:  # XMO_INVALID_SESSION_ERR
+            if code in (16777219, 16777234) or "SESSION" in desc or desc == "XMO_REQUEST_ID_ERR":
+                self._logged_in = False
                 raise XMOSessionError(msg)
             raise RuntimeError(msg)
         return resp
