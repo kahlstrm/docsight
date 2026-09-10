@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "expected_total": 580,
+  "expected_total": 583,
   "baseline_cpu_seconds": 1534.372,
   "shards": [
     {
       "id": 1,
-      "collected_cases": 81,
+      "collected_cases": 87,
       "files": [
         "test_connection_monitor.py",
         "test_module_views.py",
@@ -17,7 +17,7 @@
     },
     {
       "id": 2,
-      "collected_cases": 147,
+      "collected_cases": 143,
       "files": [
         "test_auth.py",
         "test_charts.py",
@@ -30,7 +30,7 @@
     },
     {
       "id": 3,
-      "collected_cases": 163,
+      "collected_cases": 164,
       "files": [
         "test_comparison.py",
         "test_correlation_ui.py",
