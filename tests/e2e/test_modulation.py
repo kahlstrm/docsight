@@ -282,13 +282,13 @@ class TestModulationControls:
         expect(self.page.locator(".mod-capacity-warning-list")).to_have_css("display", "flex")
         expect(self.page.locator("#mod-capacity-range-label")).to_contain_text("7d")
         expect(self.page.locator("#mod-cap-ds-min")).to_contain_text("Mbps")
-        expect(self.page.locator("#mod-cap-us-tariff")).not_to_have_text("—")
+        expect(self.page.locator("#mod-cap-us-tariff")).to_have_count(0)
 
         def partial_capacity(route):
             response = route.fetch()
             data = response.json()
             data["capacity_history"]["downstream"].update(
-                status="below_some_samples", unsupported_channel_samples=1,
+                status="observed", unsupported_channel_samples=1,
                 unsupported_channel_families={"ofdm": 1},
             )
             route.fulfill(response=response, json=data)
@@ -296,7 +296,7 @@ class TestModulationControls:
         self.page.route("**/api/modulation/distribution?*", partial_capacity)
         _switch_distribution(self.page, '#modulation-range-tabs [data-days="30"]',
                              direction="us", min_samples=30)
-        expect(self.page.locator("#mod-capacity-downstream")).to_have_css("border-left-color", "rgb(239, 68, 68)")
+        expect(self.page.locator("#mod-capacity-downstream")).to_have_css("border-left-color", "rgb(245, 158, 11)")
         caveat = self.page.locator("#mod-cap-ds-caveat")
         expect(caveat).to_be_visible()
         expect(caveat).to_contain_text("OFDM")
@@ -382,8 +382,8 @@ class TestModulationKPIs:
     def test_lowqam_populated(self):
         expect(self.page.locator("#mod-kpi-lowqam")).to_contain_text(re.compile(r"\d"))
 
-    def test_density_populated(self):
-        expect(self.page.locator("#mod-kpi-density")).to_contain_text(re.compile(r"\d"))
+    def test_sample_count_populated(self):
+        expect(self.page.locator("#mod-kpi-samples")).to_contain_text(re.compile(r"\d"))
 
     def test_health_has_color_class(self):
         expect(self.page.locator("#mod-kpi-health")).to_have_class(

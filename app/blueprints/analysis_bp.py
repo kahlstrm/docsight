@@ -3,7 +3,6 @@
 from app.runtime import current_runtime
 from app.tz import localize_timestamps, get_tz_name
 import logging
-from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 
@@ -16,20 +15,6 @@ from app.gaming_index import compute_gaming_index
 log = logging.getLogger("docsis.web")
 
 analysis_bp = Blueprint("analysis_bp", __name__)
-
-
-def _gaming_genres(grade):
-    """Return genre suitability verdicts for a given grade.
-
-    Verdicts: 'ok', 'warn', or 'bad'.
-    """
-    g = (grade or "").lower()
-    return {
-        "fps":      "ok"   if g in ("a", "b")           else "bad",
-        "moba":     "ok"   if g in ("a", "b", "c")      else "bad",
-        "mmo":      "ok"   if g in ("a", "b", "c", "d") else "bad",
-        "strategy": "ok"   if g in ("a", "b", "c")      else ("warn" if g == "d" else "bad"),
-    }
 
 
 @analysis_bp.route("/api/connection")
@@ -91,16 +76,14 @@ def api_gaming_score():
       score        - 0-100 numeric score (null if no data)
       grade        - letter grade A-F (null if no data)
       has_speedtest - whether speedtest data was included in the calculation
-      components   - per-component scores and weights used for calculation
-      genres       - suitability verdict (ok/warn/bad) per game genre
+      components   - measured values, units, and heuristic component scores
       raw          - raw measured values that fed into the calculation
     """
     _config_manager = current_runtime().config_manager
     enabled = _config_manager.is_gaming_quality_enabled() if _config_manager else False
     state = current_runtime().get_state()
-    analysis = state.get("analysis")
     speedtest_latest = state.get("speedtest_latest")
-    result = compute_gaming_index(analysis, speedtest_latest)
+    result = compute_gaming_index(speedtest_latest)
     if result is None:
         return jsonify({
             "enabled": enabled,
@@ -108,22 +91,13 @@ def api_gaming_score():
             "grade": None,
             "has_speedtest": False,
             "components": {},
-            "genres": _gaming_genres(None),
             "raw": {},
         })
-    summary = (analysis or {}).get("summary", {})
-    raw = {
-        "docsis_health": summary.get("health"),
-        "ds_snr_min": summary.get("ds_snr_min"),
-    }
-    if result.get("has_speedtest") and speedtest_latest:
-        raw["ping_ms"] = speedtest_latest.get("ping_ms")
-        raw["jitter_ms"] = speedtest_latest.get("jitter_ms")
-        raw["packet_loss_pct"] = speedtest_latest.get("packet_loss_pct")
+    raw = {field: speedtest_latest[field]
+           for field in ("ping_ms", "jitter_ms", "packet_loss_pct")}
     return jsonify({
         "enabled": enabled,
         **result,
-        "genres": _gaming_genres(result.get("grade")),
         "raw": raw,
     })
 
@@ -213,6 +187,10 @@ def api_channel_compare():
 @require_auth
 def api_correlation():
     """Return unified timeline with data from all sources for cross-source correlation.
+
+    Each entry describes its own source observation; nearby modem samples do not
+    establish signal health at the time of a speedtest.
+
     Query params:
       hours: int (default 24, max 2160 / 90d)
       sources: comma-separated list of modem,speedtest,events,bnetz,capture,segment (default all)
@@ -235,22 +213,5 @@ def api_correlation():
         sources = None
 
     timeline = _storage.get_correlation_timeline(start_ts, end_ts, sources)
-
-    # Enrich speedtest entries with closest modem health
-    modem_entries = [e for e in timeline if e["source"] == "modem"]
-    for entry in timeline:
-        if entry["source"] == "speedtest" and modem_entries:
-            closest = min(modem_entries, key=lambda m: abs(
-                datetime.fromisoformat(m["timestamp"]).timestamp() -
-                datetime.fromisoformat(entry["timestamp"]).timestamp()
-            ))
-            delta_min = abs(
-                datetime.fromisoformat(closest["timestamp"]).timestamp() -
-                datetime.fromisoformat(entry["timestamp"]).timestamp()
-            ) / 60
-            if delta_min <= 120:
-                entry["modem_health"] = closest.get("health")
-                entry["modem_ds_snr_min"] = closest.get("ds_snr_min")
-                entry["modem_ds_power_avg"] = closest.get("ds_power_avg")
 
     return jsonify(timeline)

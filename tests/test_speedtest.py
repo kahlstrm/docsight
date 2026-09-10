@@ -129,13 +129,21 @@ class TestSpeedtestClient:
         assert len(results) == 1
         r = results[0]
         assert r["ping_ms"] == 8.0
-        assert r["jitter_ms"] == 0
-        assert r["packet_loss_pct"] == 0
+        assert r["jitter_ms"] is None
+        assert r["packet_loss_pct"] is None
 
     def test_auth_headers(self):
         client = self._make_client()
         assert client.session.headers["Authorization"] == "Bearer test-token"
         assert client.session.headers["Accept"] == "application/json"
+
+    def test_explicit_null_measurements_stay_unknown(self):
+        result = self._make_client()._parse_result({
+            "ping": None, "data": {"ping": {"jitter": None}, "packetLoss": None},
+        })
+        assert result["ping_ms"] is None
+        assert result["jitter_ms"] is None
+        assert result["packet_loss_pct"] is None
 
     @patch("app.modules.speedtest.client.requests.Session.get")
     def test_insecure_tls_disables_certificate_verification(self, mock_get):
@@ -287,6 +295,20 @@ def speedtest_client(tmp_path):
 
 
 class TestSpeedtestAPI:
+    @pytest.mark.parametrize("result,expected", [
+        ({}, "—"), ({"ping_ms": None}, "—"),
+        ({"ping_ms": 0}, "0 ms"), ({"ping_ms": 12.5}, "12.5 ms"),
+    ])
+    def test_connection_test_ping_display(self, speedtest_client, result, expected):
+        with patch("app.modules.speedtest.client.SpeedtestClient") as client:
+            client.return_value.get_latest_with_error.return_value = ([result], None)
+            response = speedtest_client.post("/api/test-speedtest", json={
+                "speedtest_tracker_url": "http://speedtest.local:8999",
+                "speedtest_tracker_token": PASSWORD_MASK,
+            })
+        assert response.status_code == 200
+        assert response.get_json()["latest"]["ping"] == expected
+
     @patch("app.modules.speedtest.client.requests.Session.get")
     def test_api_speedtest(self, mock_get, speedtest_client):
         mock_resp = MagicMock()

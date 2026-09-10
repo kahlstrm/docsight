@@ -1,6 +1,9 @@
 """Tests for health, export, and state reset endpoints."""
 
 import json
+from unittest.mock import Mock, patch
+
+import pytest
 from app.runtime import current_runtime
 
 class TestHealthEndpoint:
@@ -40,6 +43,81 @@ class TestHealthEndpoint:
 
 
 class TestExportEndpoint:
+    @pytest.mark.parametrize("mode,hours,limit", [("full", 48, 10), ("update", 6, 3)])
+    def test_export_keeps_speedtests_without_inferred_modem_health(
+        self, client, sample_analysis, mode, hours, limit
+    ):
+        current_runtime().update_state(analysis=sample_analysis)
+        storage = Mock(db_path="unused.db")
+        storage.get_recent_events.return_value = []
+        # This snapshot is within the old two-hour matching window, but cannot
+        # establish modem health at the time of the speedtest.
+        storage.get_closest_snapshot.return_value = {
+            "timestamp": "2026-09-07T11:30:00Z",
+            "summary": {"health": "critical"},
+        }
+        current_runtime().storage = storage
+        with patch("app.modules.speedtest.storage.SpeedtestStorage") as speedtests, patch(
+            "app.modules.journal.storage.JournalStorage"
+        ) as journal:
+            speedtests.return_value.get_recent_speedtests.return_value = [{
+                "timestamp": "2026-09-07T10:00:00Z",
+                "download_human": "250 Mbps",
+                "upload_human": "25 Mbps",
+                "ping_ms": 12,
+            }]
+            journal.return_value.get_active_entries.return_value = []
+
+            response = client.get(f"/api/export?mode={mode}")
+
+            assert response.status_code == 200
+            report = response.get_json()["text"]
+            assert "2026-09-07T10:00:00Z | 250 Mbps | 25 Mbps | 12 ms" in report
+            assert "## Downstream Channels" in report
+            assert "## Reference Values" in report
+            assert "Cross-Source Correlation" not in report
+            assert "2026-09-07T11:30:00Z" not in report
+            storage.get_closest_snapshot.assert_not_called()
+            storage.get_recent_events.assert_called_once_with(hours=hours)
+            speedtests.return_value.get_recent_speedtests.assert_called_once_with(limit=limit)
+
+    @pytest.mark.parametrize("measurements,expected", [
+        ({}, "— | — | —"),
+        ({"ping_ms": None, "jitter_ms": None, "packet_loss_pct": None}, "— | — | —"),
+        ({"ping_ms": 0, "jitter_ms": 0, "packet_loss_pct": 0}, "0 ms | 0 ms | 0%"),
+        ({"ping_ms": 12.5, "jitter_ms": 2.5, "packet_loss_pct": 1}, "12.5 ms | 2.5 ms | 1%"),
+    ])
+    def test_export_speedtest_measurements(self, client, sample_analysis, measurements, expected):
+        current_runtime().update_state(analysis=sample_analysis)
+        storage = Mock(db_path="unused.db")
+        storage.get_recent_events.return_value = []
+        current_runtime().storage = storage
+        with patch("app.modules.speedtest.storage.SpeedtestStorage") as speedtests, patch(
+            "app.modules.journal.storage.JournalStorage"
+        ) as journal:
+            speedtests.return_value.get_recent_speedtests.return_value = [{
+                "timestamp": "2026-09-07T10:00:00Z",
+                "download_human": "250 Mbps", "upload_human": "25 Mbps",
+                **measurements,
+            }]
+            journal.return_value.get_active_entries.return_value = []
+            response = client.get("/api/export")
+        assert response.status_code == 200
+        assert f"| 250 Mbps | 25 Mbps | {expected} |" in response.get_json()["text"]
+
+    def test_export_labels_detected_speed_and_error_counts(self, client, sample_analysis):
+        current_runtime().update_state(
+            analysis=sample_analysis,
+            connection_info={"max_downstream_kbps": 250000, "max_upstream_kbps": 50000},
+        )
+
+        report = client.get("/api/export").get_json()["text"]
+
+        assert "**Modem-reported connection speed**: 250/50 Mbit/s" in report
+        assert "**Tariff**" not in report
+        assert "| DS Uncorrectable Errors | 56 |" in report
+        assert "do not infer error rates without a measurement interval and denominator" in report
+
     def test_export_no_data(self, client):
         current_runtime().reset_modem_state()
         resp = client.get("/api/export")
